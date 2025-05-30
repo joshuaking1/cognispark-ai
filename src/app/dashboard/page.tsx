@@ -16,19 +16,11 @@ import {
   FileText, 
   Brain, 
   LogOut,
-  ArrowRight,
-  Calendar,
-  Clock,
-  Sparkles,
-  Settings,
-  Camera,
-  HelpCircle
+  Clock
 } from "lucide-react";
 import LearningPlanGenerator, { LearningPlan } from "@/components/dashboard/LearningPlanGenerator";
 import ChatMessageContentRenderer from "@/components/chat/ChatMessageContentRenderer";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { updateUserProfile } from "@/app/actions/userSettingsActions";
-import { motion, AnimatePresence } from "framer-motion";
 import OnboardingDialog from "@/components/onboarding/OnboardingDialog";
 
 interface Profile {
@@ -255,7 +247,7 @@ export default function DashboardPage() {
                 {learningPlan.introduction && (
                   <p className="mb-4 text-muted-foreground italic">{learningPlan.introduction}</p>
                 )}
-                <h3 className="text-lg font-semibold mb-3">Here's your suggested plan:</h3>
+                <h3 className="text-lg font-semibold mb-3">Here&apos;s your suggested plan:</h3>
                 <ul className="space-y-3">
                   {learningPlan.steps.map((step) => (
                     <li key={step.id} className="p-3 border rounded-md bg-muted/30 hover:bg-muted/50 transition-colors">
@@ -268,7 +260,7 @@ export default function DashboardPage() {
                           <Link href={step.action_link} target={step.action_link.startsWith('http') ? '_blank' : '_self'}>
                             {step.action_link.startsWith('http') 
                               ? `Go to ${step.resource_type || 'Resource'}`
-                              : "Let's do this!"}
+                              : "Let&apos;s do this!"}
           </Link>
             </Button>
                       )}

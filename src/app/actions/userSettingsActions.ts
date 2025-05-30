@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 
 // Import Cloudinary SDK
 import { v2 as cloudinary } from 'cloudinary';
+import { UploadApiResponse } from 'cloudinary';
 
 // Configure Cloudinary (should ideally be done once, e.g. in a config file)
 // This configuration will use environment variables set on Vercel/locally
@@ -35,7 +36,7 @@ interface UpdateProfilePayload {
 interface ActionResult {
   success: boolean;
   error?: string;
-  data?: any; // For updateUserProfile's response
+  data?: Record<string, unknown>; // More specific than any
   avatarUrl?: string; // Specifically for avatar action
 }
 
@@ -59,7 +60,7 @@ export async function updateUserProfile(
     if (payload.fullName !== null && payload.fullName.trim().length < 2 && payload.fullName.trim().length !== 0) {
       return { success: false, error: "Full name must be at least 2 characters or empty to clear." };
     }
-    updates.full_name = payload.fullName === null ? null : (payload.fullName.trim() === "" ? null : payload.fullName.trim());
+    updates.fullName = payload.fullName === null ? null : (payload.fullName.trim() === "" ? null : payload.fullName.trim());
     hasMeaningfulChanges = true;
   }
 
@@ -80,23 +81,15 @@ export async function updateUserProfile(
 
   if (payload.has_completed_onboarding !== undefined) {
     updates.has_completed_onboarding = payload.has_completed_onboarding;
-    // We don't necessarily set hasMeaningfulChanges = true just for this,
-    // as the "No changes provided" message is for profile data.
   }
 
-  // Check if any actual profile data fields were intended for update,
-  // OR if only the onboarding status is being updated.
   if (!hasMeaningfulChanges && payload.has_completed_onboarding === undefined) {
-    return { success: true, error: "No profile changes provided to update." }; // Using 'error' field for info message here, client can interpret
-  }
-  // If only onboarding status changed, it's still a valid update.
-  if (!hasMeaningfulChanges && payload.has_completed_onboarding !== undefined && Object.keys(payload).length === 1) {
-     // This is fine, proceed with update just for onboarding status
+    return { success: true, error: "No profile changes provided to update." };
   }
 
   const { data, error } = await supabase
     .from("profiles")
-    .update(updates as any) // Cast as any if `updates` type is too strict due to optional fields
+    .update(updates)
     .eq("id", user.id)
     .select()
     .single();
@@ -106,8 +99,6 @@ export async function updateUserProfile(
     return { success: false, error: `Failed to update profile: ${error.message}` };
   }
 
-  // Revalidate paths if profile data that might be shown on them changed.
-  // Onboarding status change doesn't usually require revalidating data-display paths by itself.
   if (hasMeaningfulChanges) {
     revalidatePath("/dashboard");
     revalidatePath("/settings");
@@ -149,11 +140,11 @@ export async function deleteAccountAction(): Promise<ActionResult> {
 
     return { success: true, data: { message: "Account successfully deleted." } };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error deleting account:", error);
     return { 
       success: false, 
-      error: `Failed to delete account: ${error.message || 'Unknown error occurred'}` 
+      error: `Failed to delete account: ${error instanceof Error ? error.message : 'Unknown error occurred'}` 
     };
   }
 }

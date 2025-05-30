@@ -21,7 +21,7 @@ interface FlashcardQAPair {
   answer: string;
 }
 
-interface ActionResult<T = any> {
+interface ActionResult<T = unknown> {
   success: boolean;
   error?: string;
   data?: T;

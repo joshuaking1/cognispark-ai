@@ -91,8 +91,8 @@ async function handleStreamCompletion(
           "DB Error (Assistant Msg OnComplete):",
           assistantInsertError.message
         );
-    } catch (dbError: any) {
-      console.error("Catastrophic DB save error OnComplete:", dbError.message);
+    } catch (dbError: unknown) {
+      console.error("Catastrophic DB save error OnComplete:", dbError instanceof Error ? dbError.message : 'Unknown error');
     }
   }
 }

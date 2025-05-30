@@ -31,8 +31,8 @@ try {
     } else {
         console.warn("OCR Action: Google Cloud credentials not fully configured. OCR will be disabled.");
     }
-} catch (e: any) {
-    console.error("OCR Action: Error initializing Google Cloud Vision client:", e.message);
+} catch (e: unknown) {
+    console.error("OCR Action: Error initializing Google Cloud Vision client:", e instanceof Error ? e.message : 'Unknown error');
     visionClient = null; // Ensure client is null if initialization fails
 }
 
@@ -55,10 +55,10 @@ async function callActualOCRService(imageUrl: string): Promise<string | null> {
       console.log("OCR Service: No text detected in the image.", imageUrl);
       return null; // Or return an empty string, or a specific "no text found" message
     }
-  } catch (error: any) {
-    console.error("Google Cloud Vision API Error:", error.message);
+  } catch (error: unknown) {
+    console.error("Google Cloud Vision API Error:", error instanceof Error ? error.message : 'Unknown error');
     // You might want to inspect `error.code` or other details for more specific handling
-    throw new Error(`Failed to extract text using Vision API: ${error.message}`);
+    throw new Error(`Failed to extract text using Vision API: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
@@ -110,8 +110,8 @@ export async function processImageWithOCRAction(formData: FormData): Promise<OCR
         // If callActualOCRService returns null (e.g. no text detected), treat as success but no text
         return { success: true, text: "", imageUrl: imageUrl, error: "No text could be detected in the image." };
     }
-  } catch (ocrError: any) {
+  } catch (ocrError: unknown) {
     console.error("OCR Service Call Error in Action:", ocrError);
-    return { success: false, error: `OCR processing failed: ${ocrError.message}`, imageUrl: imageUrl };
+    return { success: false, error: `OCR processing failed: ${ocrError instanceof Error ? ocrError.message : 'Unknown error'}`, imageUrl: imageUrl };
   }
 }

@@ -101,9 +101,10 @@ export async function brainstormEssayIdeasAction(
 
     return { success: true, ideas };
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Groq Brainstorming Error:", error);
-    return { success: false, error: "AI brainstorming failed." };
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: `AI brainstorming failed: ${errorMessage}` };
   }
 }
 

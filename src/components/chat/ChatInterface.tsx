@@ -20,16 +20,13 @@ import {
   Clock
 } from "lucide-react";
 import { toast } from "sonner";
-import { useChat, type Message as VercelAIMessage } from "ai/react";
+import { useChat } from "ai/react";
+import type { Message as VercelAIMessage } from "ai";
 import { format, isToday, isYesterday } from "date-fns";
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 
 
-// Helper function to get search params
-const getSearchParams = () => {
-  const [params] = useSearchParams();
-  return params;
-};
+// Removed helper function as it causes issues with React hooks
 
 import { getMessagesForConversation, getConversationsListAction } from "@/app/actions/chatActions";
 import { generateConversationTitle } from "@/app/actions/generateConversationTitleAction";
@@ -45,9 +42,71 @@ interface Conversation {
   title: string;
 }
 
+// Add type definition for SpeechRecognition
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null;
+  onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => any) | null;
+  onend: ((this: SpeechRecognition, ev: Event) => any) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
+
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+  message: string;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognition;
+    webkitSpeechRecognition: new () => SpeechRecognition;
+  }
+}
+
 // Web Speech API instances
 let recognition: SpeechRecognition | null = null;
 let speechSynthesisUtterance: SpeechSynthesisUtterance | null = null;
+
+interface ChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: Date;
+}
+
+// Convert ChatMessage to VercelAIMessage
+const convertToVercelMessage = (msg: ChatMessage): VercelAIMessage => ({
+  id: msg.id,
+  role: msg.role,
+  content: msg.content,
+});
 
 export default function ChatInterface() {
   const [isVoiceInputActive, setIsVoiceInputActive] = useState(false);
@@ -65,61 +124,38 @@ export default function ChatInterface() {
   const [isTTSEnabled, setIsTTSEnabled] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const scrollArea = scrollAreaRef.current;
+  const [vercelMessages, setVercelMessages] = useState<VercelAIMessage[]>([]);
+  // Input is now managed by useChat hook instead of local state
 
   // Vercel AI SDK's useChat hook
   const {
-    messages,
-    input,
-    setInput,
+    messages: aiMessages,
+    input: aiInput,
     handleInputChange,
     handleSubmit,
     isLoading: chatIsLoading,
     error,
-    setMessages: setVercelMessages,
-    reload,
+    setMessages
   } = useChat({
-    api: "/api/chat/stream",
+    api: '/api/chat',
+    initialMessages: vercelMessages,
+    id: currentConversationId || undefined,
     body: {
-      conversationId: currentConversationId,
+      conversationId: currentConversationId || undefined
     },
-    onResponse: (response) => {
-      const newConversationId = response.headers.get('X-Conversation-Id');
-      if (newConversationId && currentConversationId !== newConversationId) {
-        setCurrentConversationId(newConversationId);
-      }
-    },
-    onFinish: (message) => {
-      if (isTTSEnabled && message.role === "assistant" && message.content) {
+    onFinish: async (message) => {
+      if (isTTSEnabled && message.role === 'assistant') {
         speakText(message.content);
       }
-      
-      const activeConversationId = currentConversationId || messages.find(m=>m.role==='assistant')?.id;
-
-      if (activeConversationId) {
-          loadConversationsList();
-          const MIN_MESSAGES_FOR_TITLE_GEN = 2;
-          const currentConvoMessages = messages.filter(m => !activeConversationId || m.id.startsWith(activeConversationId.substring(0,5)));
-          const convoDetails = conversations.find(c => c.id === activeConversationId);
-          const firstUserMessageContent = currentConvoMessages.find(m => m.role === 'user')?.content || "";
-
-          if (currentConvoMessages.length >= MIN_MESSAGES_FOR_TITLE_GEN &&
-              (!convoDetails || (firstUserMessageContent && convoDetails.title.startsWith(firstUserMessageContent.substring(0,10))) || !convoDetails.title)
-          ) {
-            generateConversationTitle(activeConversationId)
-              .then(result => { if (result.success) loadConversationsList(); })
-              .catch(err => console.error("Title gen call error:", err));
-          }
-      }
-    },
-    onError: (err) => {
-      toast.error("Chat Error", { description: err.message });
+      // Update the messages state after completion
+      setVercelMessages(prev => [...prev]);
     }
   });
 
   // Mapped messages for display with guaranteed Date objects
-  const displayMessages: DisplayMessage[] = messages.map((message) => ({
+  const displayMessages = vercelMessages.map((message) => ({
     ...message,
-    createdAt: message.createdAt ? new Date(message.createdAt) : new Date(),
+    createdAt: new Date(),
   }));
 
   // Handle URL search parameters and conversation selection
@@ -138,7 +174,7 @@ export default function ChatInterface() {
       if (currentConversationId) { // If on an existing convo and prefill comes, assume new chat with prefill
         handleNewConversation();
       }
-      setInput(decodeURIComponent(prefillMessage));
+      handleInputChange({ target: { value: decodeURIComponent(prefillMessage) } } as React.ChangeEvent<HTMLTextAreaElement>);
       hasProcessedQuery = true;
     } else if (!currentConversationId && conversations.length > 0) {
       // Optionally auto-select most recent from sidebar
@@ -149,23 +185,27 @@ export default function ChatInterface() {
       const currentPath = window.location.pathname;
       router.replace(currentPath, { scroll: false }); // Clean URL
     }
-  }, [searchParams, conversations, router, setInput]); // Removed currentConversationId, handleNewConversation, selectConversation from deps to avoid loops
+  }, [searchParams, conversations, router, handleInputChange, currentConversationId, handleNewConversation, selectConversation]); // Added proper dependencies
 
   // Function to select a conversation
   const selectConversation = useCallback(async (conversationId: string) => {
     setIsHistoryLoading(true);
     try {
       const messages = await getMessagesForConversation(conversationId);
-      setVercelMessages(messages);
+      setVercelMessages(messages.map(msg => ({
+        id: msg.id,
+        role: msg.role,
+        content: msg.content
+      })));
       setCurrentConversationId(conversationId);
-      setInput(''); // Clear input when switching conversations
-    } catch (err) {
+      handleInputChange({ target: { value: '' } } as React.ChangeEvent<HTMLTextAreaElement>); // Clear input when switching conversations
+    } catch (err: unknown) {
       console.error('Error loading conversation:', err);
       toast.error('Failed to load conversation');
     } finally {
       setIsHistoryLoading(false);
     }
-  }, [setVercelMessages]);
+  }, [setVercelMessages, handleInputChange]);
 
   const scrollToBottom = useCallback((behavior: 'auto' | 'smooth' = 'auto') => {
     const scrollArea = scrollAreaRef.current;
@@ -182,7 +222,7 @@ export default function ChatInterface() {
     try {
       const convos = await getConversationsListAction();
       setConversations(convos);
-    } catch (e) {
+    } catch (e: unknown) {
       console.error("Failed to load conversations list:", e);
       toast.error("Could not load your past conversations.");
     } finally {
@@ -191,35 +231,34 @@ export default function ChatInterface() {
   }, []);
 
   const loadMessagesForSelectedConvo = useCallback(async (convoId: string | null) => {
-    if (convoId === null) {
+    if (!convoId) {
       setVercelMessages([]);
       setCurrentConversationId(null);
-      setInput('');
+      handleInputChange({ target: { value: '' } } as React.ChangeEvent<HTMLTextAreaElement>);
       return;
     }
-    if (convoId === currentConversationId && messages.length > 0) return;
 
     setIsHistoryLoading(true);
     try {
-      const dbMessages = await getMessagesForConversation(convoId);
-      const formattedVercelMessages: VercelAIMessage[] = dbMessages.map(msg => ({
-        id: msg.id!,
-        role: msg.sender as "user" | "assistant",
+      const messages = await getMessagesForConversation(convoId);
+      // Convert ChatMessage[] to VercelAIMessage[]
+      const convertedMessages = messages.map((msg) => ({
+        id: msg.id,
+        role: msg.role as 'user' | 'assistant',
         content: msg.content,
-        createdAt: new Date(msg.created_at!),
       }));
-      setVercelMessages(formattedVercelMessages);
+      setVercelMessages(convertedMessages);
       setCurrentConversationId(convoId);
-      setInput('');
-      loadConversationsList();
-    } catch (e) {
-      console.error("Failed to load messages:", e);
-      toast.error("Could not load chat history for this conversation.");
-      setCurrentConversationId(null);
+      handleInputChange({ target: { value: '' } } as React.ChangeEvent<HTMLTextAreaElement>); // Clear input when switching conversations
+    } catch (err: unknown) {
+      console.error("Error loading messages:", err);
+      toast.error("Error", {
+        description: err instanceof Error ? err.message : "Failed to load messages",
+      });
     } finally {
       setIsHistoryLoading(false);
     }
-  }, [setVercelMessages, setInput, currentConversationId, messages.length, loadConversationsList]);
+  }, [setVercelMessages, handleInputChange, setCurrentConversationId]);
 
   // Initial load of conversations
   useEffect(() => {
@@ -228,9 +267,8 @@ export default function ChatInterface() {
 
   // Handle conversationId and prefill from URL
   useEffect(() => {
-    const urlSearchParams = new URLSearchParams(window.location.search);
-    const prefillMessage = urlSearchParams.get('prefill');
-    const requestedConversationId = urlSearchParams.get('conversationId');
+    const prefillMessage = searchParams.get('prefill');
+    const requestedConversationId = searchParams.get('conversationId');
 
     let hasProcessedQuery = false;
 
@@ -242,7 +280,7 @@ export default function ChatInterface() {
     } else if (prefillMessage) {
       setVercelMessages([]);
       setCurrentConversationId(null);
-      setInput(decodeURIComponent(prefillMessage));
+      handleInputChange({ target: { value: decodeURIComponent(prefillMessage) } } as React.ChangeEvent<HTMLTextAreaElement>);
       hasProcessedQuery = true;
     } else {
       loadConversationsList();
@@ -251,7 +289,7 @@ export default function ChatInterface() {
     if (hasProcessedQuery && pathname) {
       router.replace(pathname, { scroll: false });
     }
-  }, [window.location.search, setInput, router, pathname, currentConversationId, loadMessagesForSelectedConvo, setVercelMessages]);
+  }, [searchParams, router, pathname, currentConversationId, loadMessagesForSelectedConvo, setVercelMessages, loadConversationsList, handleInputChange]);
 
   // Scroll to bottom when new messages arrive or loading state changes
   useEffect(() => {
@@ -273,20 +311,22 @@ export default function ChatInterface() {
       const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognitionAPI) {
         recognition = new SpeechRecognitionAPI();
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        recognition.lang = 'en-US';
+        if (recognition) {
+          recognition.continuous = false;
+          recognition.interimResults = false;
+          recognition.lang = 'en-US';
 
-        recognition.onresult = (event) => {
-          const transcript = event.results[event.results.length - 1][0].transcript.trim();
-          setInput(prevInput => prevInput ? `${prevInput} ${transcript}` : transcript);
-          setIsListening(false);
-        };
-        recognition.onerror = (event) => {
-          toast.error("Voice Error", { description: `Could not recognize speech: ${event.error}` });
-          setIsListening(false);
-        };
-        recognition.onend = () => setIsListening(false);
+          recognition.onresult = (event) => {
+            const transcript = event.results[event.results.length - 1][0].transcript.trim();
+            handleInputChange({ target: { value: aiInput ? `${aiInput} ${transcript}` : transcript } } as React.ChangeEvent<HTMLTextAreaElement>);
+            setIsListening(false);
+          };
+          recognition.onerror = (event) => {
+            toast.error("Voice Error", { description: `Could not recognize speech: ${event.error}` });
+            setIsListening(false);
+          };
+          recognition.onend = () => setIsListening(false);
+        }
       } else {
         console.warn('Speech Recognition API not supported.');
       }
@@ -348,14 +388,13 @@ export default function ChatInterface() {
     loadMessagesForSelectedConvo(null);
   };
 
-  const customSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-      handleSubmit(e, {
-          options: {
-              body: {
-                  conversationId: currentConversationId
-              }
-          }
-      });
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      if (!chatIsLoading && aiInput.trim()) {
+        handleSubmit(event);
+      }
+    }
   };
 
   return (
@@ -531,137 +570,33 @@ export default function ChatInterface() {
                     </Avatar>
                   )}
                   
-                  <div className={`group relative max-w-[85%] md:max-w-[70%] ${msg.role === "user" ? "order-first" : ""}`}>
-                    <div className={`px-4 md:px-6 py-3 md:py-4 rounded-2xl shadow-lg transition-all duration-200 ${
-                      msg.role === "user" 
-                        ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-br-md" 
-                        : "bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200/50 dark:border-slate-700/50 rounded-bl-md"
+                  <div className={`space-y-2 max-w-md ${msg.role === "user" ? "order-first" : ""}`}>
+                    <p className={`text-sm font-medium line-clamp-2 ${
+                      msg.role === "user" ? "text-blue-600 dark:text-blue-400" : "text-slate-900 dark:text-slate-100"
                     }`}>
-                      {msg.role === "assistant" && messages[messages.length - 1]?.id === msg.id && !chatIsLoading && reload && (
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="absolute -top-2 -right-2 h-7 w-7 md:h-8 md:w-8 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-slate-800 border shadow-lg rounded-full" 
-                          onClick={() => reload()}
-                        >
-                          <UpdateIcon className="h-3 w-3 md:h-4 md:w-4" />
-                        </Button>
-                      )}
-                      
-                      <ChatMessageContentRenderer content={msg.content} />
-                      
-                      {msg.createdAt && (
-                        <p className={`text-[10px] md:text-xs mt-2 md:mt-3 ${
-                          msg.role === "user" 
-                            ? "text-white/70 text-right" 
-                            : "text-slate-500 dark:text-slate-400"
-                        }`}>
-                          {isToday(msg.createdAt) 
-                            ? format(msg.createdAt, "p") 
-                            : isYesterday(msg.createdAt) 
-                              ? `Yesterday ${format(msg.createdAt, "p")}` 
-                              : format(msg.createdAt, "MMM d, p")
-                          }
-                        </p>
-                      )}
-                    </div>
+                      {msg.content}
+                    </p>
                   </div>
-                  
-                  {msg.role === "user" && (
-                    <Avatar className="h-10 w-10 md:h-12 md:w-12 flex-shrink-0 shadow-lg ring-2 ring-white dark:ring-slate-800">
-                      <AvatarFallback className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold">
-                        U
-                      </AvatarFallback>
-                    </Avatar>
-                  )}
                 </div>
               ))}
-
-              {chatIsLoading && messages[messages.length - 1]?.role === 'user' && (
-                <div className="flex gap-3 md:gap-4 mb-6 md:mb-8">
-                  <Avatar className="h-10 w-10 md:h-12 md:w-12 flex-shrink-0 shadow-lg ring-2 ring-white dark:ring-slate-800">
-                    <AvatarImage src="/nova-avatar.png" alt="Nova" />
-                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-500 text-white font-semibold">
-                      N
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="max-w-[85%] md:max-w-[70%] px-4 md:px-6 py-3 md:py-4 rounded-2xl rounded-bl-md bg-white dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700/50 shadow-lg">
-                    <div className="flex items-center gap-2 md:gap-3">
-                      <div className="flex gap-1">
-                        <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-blue-500 rounded-full animate-bounce" />
-                        <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
-                        <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
-                      </div>
-                      <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400">Nova is thinking...</p>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           </ScrollArea>
         </div>
 
-        {/* Input Area - Improved for mobile */}
+        {/* Input Area */}
         <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-t border-slate-200/50 dark:border-slate-700/50 p-4 md:p-8">
-          <form onSubmit={customSubmit} className="max-w-4xl mx-auto">
-            {error && (
-              <div className="mb-4 p-3 md:p-4 text-xs md:text-sm text-red-700 bg-red-50 dark:bg-red-900/20 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-xl">
-                <p>Error: {error.message}</p>
-              </div>
-            )}
-            
-            <div className="flex items-end gap-2 md:gap-4">
-              <div className="flex-1 relative">
-                <Textarea
-                  value={input}
-                  onChange={handleInputChange}
-                  placeholder={isListening ? "Listening..." : "Ask Nova anything..."}
-                  className="min-h-[50px] md:min-h-[60px] max-h-32 resize-none rounded-2xl bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 focus:border-blue-500/50 dark:focus:border-blue-400/50 px-4 md:px-6 py-3 md:py-4 pr-12 md:pr-16 text-sm md:text-base shadow-lg transition-all duration-200"
-                  rows={1}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      if (!chatIsLoading && input.trim()) {
-                        customSubmit(e.currentTarget.form as HTMLFormElement);
-                      }
-                    }
-                  }}
-                  disabled={chatIsLoading || isHistoryLoading || isListening}
-                />
-                {input.length > 0 && (
-                  <span className="absolute right-4 md:right-6 bottom-3 md:bottom-4 text-[10px] md:text-xs text-slate-400 bg-white/80 dark:bg-slate-800/80 px-1.5 md:px-2 py-0.5 md:py-1 rounded-md">
-                    {input.length}
-                  </span>
-                )}
-              </div>
-              
-              <div className="flex gap-2 md:gap-3">
-                <Button
-                  type="button"
-                  onClick={toggleVoiceInput}
-                  variant={isListening ? "default" : "outline"}
-                  size="icon"
-                  className="h-[50px] w-[50px] md:h-[60px] md:w-[60px] rounded-2xl shadow-lg bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:bg-white dark:hover:bg-slate-800 transition-all duration-200"
-                  disabled={chatIsLoading || isHistoryLoading}
-                >
-                  {isListening ? <MicOffIcon className="h-5 w-5 md:h-6 md:w-6" /> : <MicIcon className="h-5 w-5 md:h-6 md:w-6" />}
-                </Button>
-                
-                <Button
-                  type="submit"
-                  size="lg"
-                  disabled={chatIsLoading || isHistoryLoading || !input.trim() || isListening}
-                  className="h-[50px] w-[50px] md:h-[60px] md:w-[60px] rounded-2xl bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 shadow-lg transition-all duration-200"
-                >
-                  <PaperPlaneIcon className="h-5 w-5 md:h-6 md:w-6" />
-                </Button>
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between mt-3 md:mt-4 text-[10px] md:text-xs text-slate-500 dark:text-slate-400 px-2">
-              <span className="hidden sm:inline">Press Enter to send • Shift + Enter for new line</span>
-              <span className="sm:hidden">Enter to send</span>
-              <span>LearnBridgEdu AI</span>
+          <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
+            <div className="flex items-center gap-2">
+              <Textarea
+                value={aiInput}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                placeholder="Type your message..."
+                className="flex-1"
+              />
+              <Button type="submit" disabled={chatIsLoading}>
+                <PaperPlaneIcon className="h-4 w-4" />
+              </Button>
             </div>
           </form>
         </div>

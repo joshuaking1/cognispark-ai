@@ -69,9 +69,10 @@ export async function generateQuizAction(
     if (quizInsertError) throw quizInsertError;
     if (!quizInsertData || !quizInsertData.id) throw new Error("Failed to create quiz record or retrieve its ID.");
     quizId = quizInsertData.id;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error creating quiz in DB:", error);
-    return { success: false, error: `Could not create quiz: ${error.message}` };
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: `Could not create quiz: ${errorMessage}` };
   }
 
   // 2. Prompt Groq to generate quiz questions
@@ -150,7 +151,7 @@ Your entire response must be ONLY the JSON array, starting with '[' and ending w
         typeof item === 'object' && item !== null &&
         typeof item.question_text === 'string' && item.question_text.trim() !== '' &&
         typeof item.correct_answer === 'string' && item.correct_answer.trim() !== '' &&
-        (quizType !== "multiple_choice" || (Array.isArray(item.options) && item.options.length === 4 && item.options.every((opt: any) => typeof opt === 'string')))
+        (quizType !== "multiple_choice" || (Array.isArray(item.options) && item.options.length === 4 && item.options.every((opt: string) => typeof opt === 'string')))
     ).map((item, index) => ({ // Add order and ensure structure
         question_text: item.question_text,
         options: item.options,
@@ -167,13 +168,12 @@ Your entire response must be ONLY the JSON array, starting with '[' and ending w
         throw new Error("AI generated no valid quiz questions from the source.");
     }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error generating quiz questions with Groq:", error);
-    // If AI fails, the quiz entry exists but is empty. Consider deleting it or notifying user.
-    // For now, return error; the quiz entry remains.
-    await supabase.from("quizzes").delete().eq("id", quizId); // Attempt to delete the empty quiz
+    await supabase.from("quizzes").delete().eq("id", quizId);
     console.log(`Attempted to delete empty quiz ${quizId} after AI failure.`);
-    return { success: false, error: `AI quiz generation failed: ${error.message}` };
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return { success: false, error: `AI quiz generation failed: ${errorMessage}` };
   }
 
   // 3. Insert generated questions into the database
