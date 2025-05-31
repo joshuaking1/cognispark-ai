@@ -44,12 +44,12 @@ export default function HomePage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link href="/signup">
-                <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02]">
-                  Get Started Free <ArrowRight className="ml-2 h-5 w-5" />
+                <Button size="lg" className="w-full sm:w-auto">
+                  Get Started <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
               <Link href="/login">
-                <Button size="lg" variant="outline" className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto">
                   Sign In
                 </Button>
               </Link>
@@ -116,7 +116,7 @@ export default function HomePage() {
                 transition={{ duration: 0.5, delay: index * 0.1 }}
                 viewport={{ once: true }}
               >
-                <Card className="h-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:shadow-lg transition-all duration-200">
+                <Card className="h-full">
                   <CardContent className="p-6">
                     <div className="mb-4">{feature.icon}</div>
                     <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
@@ -139,7 +139,7 @@ export default function HomePage() {
             viewport={{ once: true }}
             className="max-w-4xl mx-auto"
           >
-            <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50">
+            <Card>
               <CardContent className="p-8">
                 <div className="flex items-center gap-4 mb-6">
                   <Sparkles className="h-8 w-8 text-yellow-500" />
@@ -191,11 +191,10 @@ export default function HomePage() {
             </h2>
             <p className="text-lg text-slate-600 dark:text-slate-300 mb-8">
               CogniSpark AI is the latest innovation from LearnBridgeEdu, a pioneer in educational technology in Ghana. 
-               we've created a next-generation 
-              platform that leverages cutting-edge AI to deliver personalized learning experiences.
+              We've created a next-generation platform that leverages cutting-edge AI to deliver personalized learning experiences.
             </p>
             <Link href="/signup">
-              <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02]">
+              <Button size="lg">
                 Join the Beta <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             </Link>

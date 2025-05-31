@@ -26,7 +26,7 @@ if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && proce
 const AVATAR_BUCKET = "avatars";
 
 interface UpdateProfilePayload {
-  fullName?: string | null; // Allow null to clear
+  fullName?: string | null; // Allow null to clear (camelCase in payload, will be mapped to full_name in DB)
   date_of_birth?: string | null; // YYYY-MM-DD string, allow null
   grade_level?: string | null;   // Allow null
   subjects_of_interest?: string[]; // Array of strings
@@ -61,7 +61,7 @@ export async function updateUserProfile(
     if (payload.fullName !== null && payload.fullName.trim().length < 2 && payload.fullName.trim().length !== 0) {
       return { success: false, error: "Full name must be at least 2 characters or empty to clear." };
     }
-    updates.fullName = payload.fullName === null ? null : (payload.fullName.trim() === "" ? null : payload.fullName.trim());
+    updates.full_name = payload.fullName === null ? null : (payload.fullName.trim() === "" ? null : payload.fullName.trim());
     hasMeaningfulChanges = true;
   }
 

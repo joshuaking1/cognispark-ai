@@ -131,7 +131,6 @@ function StudySessionContent() {
   const handleSRSResponse = async (quality: 0 | 1 | 2 | 3) => {
     if (!currentCard) return;
     
-    // Add to session performance data
     setSessionPerformance(prev => [...prev, {
       cardId: currentCard.id,
       question: currentCard.question,
@@ -147,12 +146,9 @@ function StudySessionContent() {
             if (currentCardIndex < studySessionCards.length - 1) {
               handleNavigateCard('next');
             } else {
-              // Study session complete - generate report
               toast.success("Study session complete! Generating your report...");
               setIsGeneratingReport(true);
               const userGrade = profile?.grade_level;
-              
-              // Get all set titles for the report
               const allSetTitles = Object.values(setTitles).join(", ");
               
               generateStudyReportAction(allSetTitles, sessionPerformance, userGrade)
@@ -225,20 +221,20 @@ function StudySessionContent() {
         <Button 
           variant="outline" 
           onClick={() => router.push('/flashcards')}
-          className="w-full sm:w-auto bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:bg-white dark:hover:bg-slate-800 transition-all duration-200"
+          className="w-full sm:w-auto"
         >
           <ArrowLeftIcon className="mr-2 h-4 w-4" /> Back to My Sets
         </Button>
         <Button 
           variant="outline" 
           onClick={handleShuffleCards}
-          className="w-full sm:w-auto bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:bg-white dark:hover:bg-slate-800 transition-all duration-200"
+          className="w-full sm:w-auto"
         >
           <RefreshCwIcon className="mr-2 h-4 w-4" /> Shuffle Cards
         </Button>
       </div>
 
-      <Card className="max-w-2xl mx-auto shadow-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50">
+      <Card className="max-w-2xl mx-auto">
         <CardHeader className="pb-4">
           <CardTitle className="text-xl md:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Studying Multiple Sets
@@ -253,20 +249,20 @@ function StudySessionContent() {
             <div className="w-full sm:w-48">
               <Progress 
                 value={sessionProgress} 
-                className="h-2 bg-slate-100 dark:bg-slate-800" 
+                className="h-2" 
               />
             </div>
           </div>
         </CardHeader>
 
-        <CardContent className="min-h-[200px] md:min-h-[300px] flex flex-col items-center justify-center p-4 md:p-6 relative overflow-hidden border-t border-b border-slate-200/50 dark:border-slate-700/50">
+        <CardContent className="min-h-[200px] md:min-h-[300px] flex flex-col items-center justify-center p-4 md:p-6 relative overflow-hidden border-t border-b">
           <div className="w-full text-center space-y-4">
             <div className="text-lg md:text-xl lg:text-2xl font-medium mb-4">
               {isShowingAnswer ? currentCard?.answer : currentCard?.question}
             </div>
             {currentCard && (
               <div className="text-sm text-muted-foreground flex items-center justify-center gap-2">
-                <span className="px-2 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs">
+                <span className="px-2 py-1 rounded-full bg-muted text-xs">
                   From: {setTitles[currentCard.set_id] || "Unknown Set"}
                 </span>
               </div>
@@ -279,7 +275,7 @@ function StudySessionContent() {
             <Button 
               variant="outline" 
               onClick={handleFlipCard}
-              className="w-full sm:w-auto bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:bg-white dark:hover:bg-slate-800 transition-all duration-200"
+              className="w-full sm:w-auto"
             >
               {isShowingAnswer ? "Show Question" : "Show Answer"}
             </Button>
@@ -288,7 +284,7 @@ function StudySessionContent() {
                 variant="outline" 
                 onClick={() => handleNavigateCard('prev')} 
                 disabled={currentCardIndex === 0}
-                className="flex-1 sm:flex-none bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:bg-white dark:hover:bg-slate-800 transition-all duration-200"
+                className="flex-1 sm:flex-none"
               >
                 <ArrowLeftIcon className="mr-2 h-4 w-4" /> Previous
               </Button>
@@ -296,12 +292,29 @@ function StudySessionContent() {
                 variant="outline" 
                 onClick={() => handleNavigateCard('next')} 
                 disabled={currentCardIndex === studySessionCards.length - 1}
-                className="flex-1 sm:flex-none bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:bg-white dark:hover:bg-slate-800 transition-all duration-200"
+                className="flex-1 sm:flex-none"
               >
                 Next <ArrowRightIcon className="ml-2 h-4 w-4" />
               </Button>
             </div>
           </div>
+
+          {isShowingAnswer && (
+            <>
+              <p className="text-sm text-muted-foreground">How well did you recall the answer?</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 w-full">
+                {srsQualityRatings.map(rating => (
+                  <Button
+                    key={rating.value}
+                    onClick={() => handleSRSResponse(rating.value as 0|1|2|3)}
+                    className={`${rating.color} text-white transition-all duration-200 hover:scale-[1.02]`}
+                  >
+                    {rating.icon} {rating.label}
+                  </Button>
+                ))}
+              </div>
+            </>
+          )}
         </CardFooter>
       </Card>
 

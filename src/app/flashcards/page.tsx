@@ -91,25 +91,13 @@ export default function FlashcardsListPage() {
                 <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                     My Flashcard Sets
                 </h1>
-                <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 w-full sm:w-auto">
-                    {selectedSetIds.length > 0 && (
-                        <Button 
-                            onClick={handleStudySelected} 
-                            variant="default"
-                            className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02]"
-                        >
-                            <Play className="mr-2 h-4 w-4 md:h-5 md:w-5" /> 
-                            Study Selected ({selectedSetIds.length})
-                        </Button>
-                    )}
-                    <Link href="/flashcards/create" className="w-full sm:w-auto">
-                        <Button 
-                            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02]"
-                        >
-                            <PlusCircle className="mr-2 h-4 w-4 md:h-5 md:w-5" /> 
-                            Create New Set
-                        </Button>
-                    </Link>
+                <div className="flex gap-2">
+                    <Button onClick={handleStudySelected} disabled={selectedSetIds.length === 0}>
+                        <Play className="mr-2 h-4 w-4" /> Study Selected
+                    </Button>
+                    <Button onClick={() => router.push('/flashcards/create')}>
+                        <PlusCircle className="mr-2 h-4 w-4" /> Create New Set
+                    </Button>
                 </div>
             </div>
 
@@ -117,14 +105,10 @@ export default function FlashcardsListPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                     {[1, 2, 3].map((i) => (
                         <Card key={i} className="animate-pulse">
-                            <div className="flex items-start p-6">
-                                <div className="h-4 w-4 bg-slate-200 dark:bg-slate-700 rounded mr-4 mt-1" />
-                                <div className="flex-grow space-y-3">
-                                    <div className="h-6 bg-slate-200 dark:bg-slate-700 rounded w-3/4" />
-                                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-full" />
-                                    <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/4" />
-                                </div>
-                            </div>
+                            <CardContent className="p-6">
+                                <div className="h-4 bg-muted rounded w-3/4 mb-4"></div>
+                                <div className="h-3 bg-muted rounded w-1/2"></div>
+                            </CardContent>
                         </Card>
                     ))}
                 </div>
@@ -133,7 +117,7 @@ export default function FlashcardsListPage() {
                     {flashcardSets.map((set) => (
                         <Card 
                             key={set.id} 
-                            className="group hover:shadow-lg transition-all duration-200 hover:scale-[1.02] bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50"
+                            className="group hover:shadow-lg transition-all duration-200 hover:scale-[1.02]"
                         >
                             <div className="flex items-start p-4 md:p-6">
                                 <Checkbox
@@ -141,48 +125,36 @@ export default function FlashcardsListPage() {
                                     onCheckedChange={() => handleSetSelect(set.id)}
                                     className="mr-4 mt-1"
                                 />
-                                <Link href={`/flashcards/set/${set.id}`} className="flex-grow">
-                                    <CardHeader className="p-0">
-                                        <CardTitle className="text-lg md:text-xl font-semibold truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                                            {set.title}
-                                        </CardTitle>
-                                        {set.description && (
-                                            <CardDescription className="text-sm h-10 overflow-hidden text-ellipsis line-clamp-2">
-                                                {set.description}
-                                            </CardDescription>
-                                        )}
-                                    </CardHeader>
-                                    <CardContent className="p-0 mt-2">
-                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                            <span className="flex items-center gap-1">
-                                                <span className="font-medium">{set.card_count || 0}</span>
-                                                <span>card{set.card_count !== 1 ? 's' : ''}</span>
-                                            </span>
-                                            <span>•</span>
-                                            <span>Updated {new Date(set.updated_at).toLocaleDateString()}</span>
-                                        </div>
-                                    </CardContent>
-                                </Link>
+                                <div className="flex-1">
+                                    <CardTitle className="text-lg font-semibold mb-2">
+                                        {set.title}
+                                    </CardTitle>
+                                    {set.description && (
+                                        <CardDescription className="text-sm mb-4">
+                                            {set.description}
+                                        </CardDescription>
+                                    )}
+                                    <div className="flex justify-between items-center text-sm text-muted-foreground">
+                                        <span>{set.card_count} cards</span>
+                                        <span>Updated {new Date(set.updated_at).toLocaleDateString()}</span>
+                                    </div>
+                                </div>
                             </div>
                         </Card>
                     ))}
                 </div>
             ) : (
-                <div className="text-center py-10 px-4">
-                    <div className="max-w-md mx-auto space-y-4">
-                        <h3 className="text-xl text-muted-foreground">You haven't created any flashcard sets yet.</h3>
-                        <p className="text-sm text-muted-foreground">Create your first set to start learning!</p>
-                        <Link href="/flashcards/create" className="inline-block">
-                            <Button 
-                                variant="default" 
-                                size="lg"
-                                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02]"
-                            >
-                                Create Your First Set
-                            </Button>
-                        </Link>
-                    </div>
-                </div>
+                <Card className="max-w-2xl mx-auto">
+                    <CardContent className="py-12 text-center">
+                        <h2 className="text-xl font-semibold mb-2">No Flashcard Sets Yet</h2>
+                        <p className="text-muted-foreground mb-6">
+                            Create your first flashcard set to start learning!
+                        </p>
+                        <Button onClick={() => router.push('/flashcards/create')}>
+                            <PlusCircle className="mr-2 h-4 w-4" /> Create Your First Set
+                        </Button>
+                    </CardContent>
+                </Card>
             )}
         </div>
     );

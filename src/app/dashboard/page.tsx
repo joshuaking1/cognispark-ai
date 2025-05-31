@@ -1,15 +1,22 @@
 "use client";
 
+import React from "react";
 import { useState, useEffect } from "react";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   Loader2, 
@@ -25,7 +32,16 @@ import {
   Sparkles,
   Settings,
   Camera,
-  HelpCircle
+  HelpCircle,
+  TrendingUp,
+  Target,
+  Award,
+  Users,
+  ChevronRight,
+  PlayCircle,
+  CheckCircle2,
+  Star,
+  Zap
 } from "lucide-react";
 import LearningPlanGenerator, { LearningPlan } from "@/components/dashboard/LearningPlanGenerator";
 import ChatMessageContentRenderer from "@/components/chat/ChatMessageContentRenderer";
@@ -68,6 +84,12 @@ export default function DashboardPage() {
   const [activePlan, setActivePlan] = useState<LearningPlan | null>(null);
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [stats, setStats] = useState({
+    totalFlashcards: 0,
+    totalChats: 0,
+    totalQuizzes: 0,
+    masteryLevel: 0
+  });
 
   const supabase = createClientComponentClient();
 
@@ -100,13 +122,36 @@ export default function DashboardPage() {
 
         // Fetch recent activity
         const { data: activityData } = await supabase
-          .from('recent_activity')
+          .from('activity_log')
           .select('*')
           .eq('user_id', session.user.id)
           .order('timestamp', { ascending: false })
           .limit(5);
 
         setRecentActivity(activityData || []);
+
+        // Fetch stats
+        const { count: flashcardCount } = await supabase
+          .from('flashcards')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', session.user.id);
+
+        const { count: chatCount } = await supabase
+          .from('chat_sessions')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', session.user.id);
+
+        const { count: quizCount } = await supabase
+          .from('quiz_attempts')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', session.user.id);
+
+        setStats({
+          totalFlashcards: flashcardCount || 0,
+          totalChats: chatCount || 0,
+          totalQuizzes: quizCount || 0,
+          masteryLevel: 75 // This would be calculated based on actual performance
+        });
 
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -184,10 +229,85 @@ export default function DashboardPage() {
     }
   };
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 18) return "Good afternoon";
+    return "Good evening";
+  };
+
+  const calculatePlanProgress = () => {
+    if (!activePlan || activePlan.steps.length === 0) return 0;
+    return Math.round((completedSteps.length / activePlan.steps.length) * 100);
+  };
+
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="container mx-auto py-8 px-4 space-y-8">
+        {/* Header Skeleton */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-64" />
+          </div>
+          <Skeleton className="h-10 w-32" />
+        </div>
+        
+        {/* Stats Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-8 w-16" />
+                  </div>
+                  <Skeleton className="h-8 w-8 rounded" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Content Skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-32" />
+                <Skeleton className="h-4 w-48" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          <div>
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-32" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center gap-4">
+                      <Skeleton className="h-12 w-12 rounded-full" />
+                      <div className="space-y-2 flex-1">
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-4 w-1/2" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     );
   }
@@ -199,258 +319,354 @@ export default function DashboardPage() {
   // Determine which plan to display
   const displayPlan = activePlan || learningPlan;
   const isGeneratedPlanPendingActivation = learningPlan && !activePlan;
+  const planProgress = calculatePlanProgress();
 
   return (
-    <div className="flex flex-col gap-10 p-4 md:p-8">
-      {/* Header Section */}
-      <section className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="flex items-center gap-4">
-          <Avatar className="h-16 w-16">
-            <AvatarImage src={profile?.avatar_url || undefined} />
-            <AvatarFallback>
-              {profile?.full_name?.charAt(0) || user.email?.charAt(0) || 'U'}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <h1 className="text-2xl font-bold">
-              Welcome back, {profile?.full_name || user.email?.split('@')[0] || 'User'}!
-            </h1>
-            <p className="text-muted-foreground">
-              {profile?.grade_level ? `Grade ${profile.grade_level}` : 'No grade level set'}
-            </p>
-          </div>
+    <div className="container mx-auto py-8 px-4 space-y-8">
+      {/* Welcome Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight">
+            {getGreeting()}{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}!
+          </h1>
+          <p className="text-muted-foreground">
+            Ready to continue your learning journey?
+          </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/settings">
-              <Settings className="mr-2 h-4 w-4" />
-              Settings
-            </Link>
-          </Button>
-          <Button variant="outline" onClick={() => supabase.auth.signOut()}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Sign Out
+          <Button onClick={() => router.push('/chat')} size="lg">
+            <MessageSquare className="mr-2 h-4 w-4" />
+            Start Learning
           </Button>
         </div>
-      </section>
+      </div>
 
-      {/* Learning Plan Section */}
-      <section>
-        <Card className="shadow-lg">
-          <CardHeader>
-            <CardTitle className="text-xl md:text-2xl flex items-center">
-              <Lightbulb className="mr-3 h-6 w-6 text-yellow-500" />
-              {activePlan ? "Your Active Learning Plan" : "Generate a Learning Plan"}
-            </CardTitle>
-            {!activePlan && <CardDescription>Tell Nova your goal or let it suggest a plan.</CardDescription>}
-          </CardHeader>
-          <CardContent>
-            {!activePlan && !learningPlan && (
-              <LearningPlanGenerator onPlanGenerated={handlePlanGenerated} />
-            )}
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="relative overflow-hidden">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Flashcards</p>
+                <h3 className="text-2xl font-bold">{stats.totalFlashcards}</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  <TrendingUp className="h-3 w-3 inline mr-1" />
+                  +12% this week
+                </p>
+              </div>
+              <div className="h-12 w-12 bg-blue-100 dark:bg-blue-900/20 rounded-lg flex items-center justify-center">
+                <BookOpen className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-            {displayPlan && (
-              <div className="mt-4 pt-4 border-t">
-                {displayPlan.introduction && (
-                  <p className="mb-4 text-muted-foreground italic">{displayPlan.introduction}</p>
-                )}
-                <h3 className="text-lg font-semibold mb-3">
-                  {isGeneratedPlanPendingActivation ? "Suggested Plan (Not Active Yet):" : "Current Steps:"}
-                </h3>
-                <ul className="space-y-3">
-                  {displayPlan.steps.map((step) => {
-                    const isCompleted = completedSteps.includes(step.id);
-                    return (
-                      <li 
-                        key={step.id} 
-                        className={`p-3 border rounded-md transition-colors ${
-                          isCompleted 
-                            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700' 
-                            : 'bg-muted/30 hover:bg-muted/50'
-                        }`}
-                      >
-                        <div className="flex items-start gap-3">
-                          {activePlan === displayPlan && (
-                            <Checkbox
-                              id={`step-${step.id}`}
-                              checked={isCompleted}
-                              onCheckedChange={() => toggleStepCompletion(step.id)}
-                              className="mt-1"
-                            />
-                          )}
-                          <div className="flex-grow">
-                            <Label 
-                              htmlFor={`step-${step.id}`} 
-                              className={`font-medium text-primary cursor-pointer ${
-                                isCompleted ? 'line-through text-muted-foreground' : ''
-                              }`}
-                            >
-                              {step.title}
-                            </Label>
-                            {step.description && (
-                              <div className={`text-sm mt-1 ${
-                                isCompleted ? 'text-muted-foreground' : 'text-foreground/80'
-                              }`}>
-                                <ChatMessageContentRenderer content={step.description} />
-                              </div>
-                            )}
-                            {step.action_link && (
-                              <Button 
-                                asChild 
-                                variant="link" 
-                                size="sm" 
-                                className="px-0 h-auto mt-1 text-xs"
-                              >
-                                <Link 
-                                  href={step.action_link} 
-                                  target={step.action_link.startsWith('http') ? '_blank' : '_self'}
-                                >
-                                  {step.action_link.startsWith('http') 
-                                    ? `Go to ${step.resource_type || 'Resource'}` 
-                                    : "Let's do this!"}
-                                </Link>
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-                {displayPlan.conclusion && (
-                  <p className="mt-4 text-muted-foreground italic">{displayPlan.conclusion}</p>
-                )}
+        <Card className="relative overflow-hidden">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Chat Sessions</p>
+                <h3 className="text-2xl font-bold">{stats.totalChats}</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  <TrendingUp className="h-3 w-3 inline mr-1" />
+                  +5% this week
+                </p>
+              </div>
+              <div className="h-12 w-12 bg-green-100 dark:bg-green-900/20 rounded-lg flex items-center justify-center">
+                <MessageSquare className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-                {isGeneratedPlanPendingActivation && learningPlan && (
-                  <div className="mt-6 flex gap-2">
-                    <Button onClick={handleActivatePlan}>
-                      <Sparkles className="mr-2 h-4"/>Activate This Plan
-                    </Button>
-                    <Button variant="outline" onClick={() => setLearningPlan(null)}>
-                      Dismiss Suggestion
-                    </Button>
+        <Card className="relative overflow-hidden">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Quizzes</p>
+                <h3 className="text-2xl font-bold">{stats.totalQuizzes}</h3>
+                <p className="text-xs text-muted-foreground mt-1">
+                  <TrendingUp className="h-3 w-3 inline mr-1" />
+                  +8% this week
+                </p>
+              </div>
+              <div className="h-12 w-12 bg-purple-100 dark:bg-purple-900/20 rounded-lg flex items-center justify-center">
+                <FileText className="h-6 w-6 text-purple-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="relative overflow-hidden">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Mastery Level</p>
+                <h3 className="text-2xl font-bold">{stats.masteryLevel}%</h3>
+                <Progress value={stats.masteryLevel} className="mt-2 h-2" />
+              </div>
+              <div className="h-12 w-12 bg-gradient-to-br from-orange-400 to-pink-500 rounded-lg flex items-center justify-center">
+                <Award className="h-6 w-6 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Learning Plan Section */}
+        <div className="lg:col-span-2">
+          <Card className="h-fit">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 bg-yellow-100 dark:bg-yellow-900/20 rounded-lg flex items-center justify-center">
+                    <Lightbulb className="h-5 w-5 text-yellow-600" />
                   </div>
-                )}
-                {activePlan && !learningPlan && (
-                  <Button 
-                    variant="outline" 
-                    onClick={handleClearActivePlan} 
-                    className="mt-6"
-                  >
-                    Clear Active Plan & Generate New
-                  </Button>
+                  <div>
+                    <CardTitle className="text-xl">
+                      {activePlan ? "Your Learning Plan" : "Generate Learning Plan"}
+                    </CardTitle>
+                    <CardDescription>
+                      {activePlan 
+                        ? `${planProgress}% complete • ${completedSteps.length}/${activePlan.steps.length} steps done`
+                        : "Let Nova create a personalized learning plan for you"
+                      }
+                    </CardDescription>
+                  </div>
+                </div>
+                {activePlan && (
+                  <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Active
+                  </Badge>
                 )}
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </section>
-
-      {/* Quick Access Features */}
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="hover:shadow-md transition-shadow">
-          <Link href="/flashcards" className="block p-6">
-            <CardHeader className="p-0">
-              <CardTitle className="text-lg flex items-center">
-                <BookOpen className="mr-2 h-5 w-5 text-blue-500" />
-                Flashcards
-              </CardTitle>
+              {activePlan && (
+                <Progress value={planProgress} className="h-2" />
+              )}
             </CardHeader>
-            <CardContent className="p-0 mt-2">
-              <p className="text-sm text-muted-foreground">
-                Review and create flashcards
-              </p>
-            </CardContent>
-          </Link>
-        </Card>
+            <CardContent>
+              {!activePlan && !learningPlan && (
+                <LearningPlanGenerator onPlanGenerated={handlePlanGenerated} />
+              )}
 
-        <Card className="hover:shadow-md transition-shadow">
-          <Link href="/chat" className="block p-6">
-            <CardHeader className="p-0">
-              <CardTitle className="text-lg flex items-center">
-                <MessageSquare className="mr-2 h-5 w-5 text-green-500" />
-                Chat with Nova
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0 mt-2">
-              <p className="text-sm text-muted-foreground">
-                Ask questions and get help
-              </p>
-            </CardContent>
-          </Link>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow">
-          <Link href="/quiz" className="block p-6">
-            <CardHeader className="p-0">
-              <CardTitle className="text-lg flex items-center">
-                <FileText className="mr-2 h-5 w-5 text-purple-500" />
-                Take a Quiz
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0 mt-2">
-              <p className="text-sm text-muted-foreground">
-                Test your knowledge
-              </p>
-            </CardContent>
-          </Link>
-        </Card>
-
-        <Card className="hover:shadow-md transition-shadow">
-          <Link href="/settings" className="block p-6">
-            <CardHeader className="p-0">
-              <CardTitle className="text-lg flex items-center">
-                <Settings className="mr-2 h-5 w-5 text-gray-500" />
-                Settings
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-0 mt-2">
-              <p className="text-sm text-muted-foreground">
-                Manage your preferences
-              </p>
-            </CardContent>
-          </Link>
-        </Card>
-      </section>
-
-      {/* Recent Activity */}
-      <section>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-xl">Recent Activity</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[300px] pr-4">
-              {recentActivity.length > 0 ? (
+              {displayPlan && (
                 <div className="space-y-4">
-                  {recentActivity.map((activity) => (
-                    <div key={activity.id} className="flex items-start gap-4 p-3 rounded-lg bg-muted/30">
-                      <div className="mt-1">
-                        {activity.type === 'flashcard' && <BookOpen className="h-5 w-5 text-blue-500" />}
-                        {activity.type === 'chat' && <MessageSquare className="h-5 w-5 text-green-500" />}
-                        {activity.type === 'quiz' && <FileText className="h-5 w-5 text-purple-500" />}
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-medium">{activity.title}</h4>
-                        {activity.details && (
-                          <p className="text-sm text-muted-foreground mt-1">{activity.details}</p>
-                        )}
-                        <p className="text-xs text-muted-foreground mt-2">
-                          {new Date(activity.timestamp).toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center text-muted-foreground py-8">
-                  No recent activity
+                  {displayPlan.introduction && (
+                    <Alert>
+                      <Sparkles className="h-4 w-4" />
+                      <AlertDescription className="text-sm">
+                        {displayPlan.introduction}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="space-y-3">
+                    {displayPlan.steps.map((step, index) => {
+                      const isCompleted = completedSteps.includes(step.id);
+                      return (
+                        <Card 
+                          key={step.id} 
+                          className={`transition-all duration-200 ${
+                            isCompleted 
+                              ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800' 
+                              : 'hover:shadow-md'
+                          }`}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                              {activePlan === displayPlan ? (
+                                <Checkbox
+                                  id={`step-${step.id}`}
+                                  checked={isCompleted}
+                                  onCheckedChange={() => toggleStepCompletion(step.id)}
+                                  className="mt-1"
+                                />
+                              ) : (
+                                <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center mt-1 text-xs font-medium">
+                                  {index + 1}
+                                </div>
+                              )}
+                              <div className="flex-grow space-y-2">
+                                <Label 
+                                  htmlFor={`step-${step.id}`} 
+                                  className={`font-medium cursor-pointer ${
+                                    isCompleted ? 'line-through text-muted-foreground' : ''
+                                  }`}
+                                >
+                                  {step.title}
+                                </Label>
+                                {step.description && (
+                                  <div className={`text-sm ${
+                                    isCompleted ? 'text-muted-foreground' : 'text-muted-foreground'
+                                  }`}>
+                                    <ChatMessageContentRenderer content={step.description} />
+                                  </div>
+                                )}
+                                {step.action_link && (
+                                  <Button 
+                                    asChild 
+                                    variant="link" 
+                                    size="sm" 
+                                    className="h-auto p-0 text-xs"
+                                  >
+                                    <Link 
+                                      href={step.action_link} 
+                                      target={step.action_link.startsWith('http') ? '_blank' : '_self'}
+                                      className="flex items-center gap-1"
+                                    >
+                                      <PlayCircle className="h-3 w-3" />
+                                      {step.action_link.startsWith('http') 
+                                        ? `Go to ${step.resource_type || 'Resource'}` 
+                                        : "Let's do this!"}
+                                    </Link>
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+
+                  {displayPlan.conclusion && (
+                    <Alert>
+                      <Target className="h-4 w-4" />
+                      <AlertDescription className="text-sm">
+                        {displayPlan.conclusion}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  <Separator />
+
+                  <div className="flex gap-3">
+                    {isGeneratedPlanPendingActivation && learningPlan && (
+                      <>
+                        <Button onClick={handleActivatePlan} className="flex-1">
+                          <Zap className="mr-2 h-4 w-4" />
+                          Activate This Plan
+                        </Button>
+                        <Button variant="outline" onClick={() => setLearningPlan(null)}>
+                          Dismiss
+                        </Button>
+                      </>
+                    )}
+                    {activePlan && !learningPlan && (
+                      <Button 
+                        variant="outline" 
+                        onClick={handleClearActivePlan}
+                      >
+                        Generate New Plan
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      </section>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
+          {/* Quick Actions */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Quick Actions</CardTitle>
+              <CardDescription>Jump into your favorite activities</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Button asChild variant="ghost" className="w-full justify-start h-12">
+                <Link href="/flashcards">
+                  <BookOpen className="mr-3 h-5 w-5 text-blue-500" />
+                  <div className="text-left">
+                    <div className="font-medium">Study Flashcards</div>
+                    <div className="text-xs text-muted-foreground">Review your cards</div>
+                  </div>
+                  <ChevronRight className="ml-auto h-4 w-4" />
+                </Link>
+              </Button>
+              
+              <Button asChild variant="ghost" className="w-full justify-start h-12">
+                <Link href="/chat">
+                  <MessageSquare className="mr-3 h-5 w-5 text-green-500" />
+                  <div className="text-left">
+                    <div className="font-medium">Chat with Nova</div>
+                    <div className="text-xs text-muted-foreground">Ask questions</div>
+                  </div>
+                  <ChevronRight className="ml-auto h-4 w-4" />
+                </Link>
+              </Button>
+              
+              <Button asChild variant="ghost" className="w-full justify-start h-12">
+                <Link href="/quiz">
+                  <FileText className="mr-3 h-5 w-5 text-purple-500" />
+                  <div className="text-left">
+                    <div className="font-medium">Take Quiz</div>
+                    <div className="text-xs text-muted-foreground">Test knowledge</div>
+                  </div>
+                  <ChevronRight className="ml-auto h-4 w-4" />
+                </Link>
+              </Button>
+              
+              <Button asChild variant="ghost" className="w-full justify-start h-12">
+                <Link href="/settings">
+                  <Settings className="mr-3 h-5 w-5 text-gray-500" />
+                  <div className="text-left">
+                    <div className="font-medium">Settings</div>
+                    <div className="text-xs text-muted-foreground">Preferences</div>
+                  </div>
+                  <ChevronRight className="ml-auto h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Recent Activity */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Recent Activity</CardTitle>
+              <CardDescription>Your latest learning sessions</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[300px] pr-4">
+                {recentActivity.length > 0 ? (
+                  <div className="space-y-4">
+                    {recentActivity.map((activity) => (
+                      <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/50">
+                        <div className="h-8 w-8 rounded-full bg-background flex items-center justify-center">
+                          {activity.type === 'flashcard' && <BookOpen className="h-4 w-4 text-blue-500" />}
+                          {activity.type === 'chat' && <MessageSquare className="h-4 w-4 text-green-500" />}
+                          {activity.type === 'quiz' && <FileText className="h-4 w-4 text-purple-500" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{activity.title}</p>
+                          {activity.details && (
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{activity.details}</p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {new Date(activity.timestamp).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center text-muted-foreground py-8">
+                    <Brain className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-sm">No recent activity</p>
+                    <p className="text-xs mt-1">Start learning to see your progress here</p>
+                  </div>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       {/* Onboarding Dialog */}
       <OnboardingDialog

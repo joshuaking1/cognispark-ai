@@ -723,7 +723,7 @@ export default function StudyFlashcardSetPage() {
         </div>
       </div>
 
-      <Card className="max-w-2xl mx-auto shadow-lg">
+      <Card className="max-w-2xl mx-auto">
         <CardHeader className="pb-4">
           <CardTitle className="text-2xl md:text-3xl truncate">{flashcardSetInfo?.title}</CardTitle>
           {flashcardSetInfo?.description && (
@@ -761,42 +761,21 @@ export default function StudyFlashcardSetPage() {
               : `Browsing: Card ${allCardsInSet.length > 0 ? currentCardIndex + 1 : 0} of ${allCardsInSet.length}`
             }
           </p>
-          {isStudyModeActive && studySessionCards.length > 0 && (
-            <Progress value={sessionProgress} className="mt-2 h-2" />
-          )}
         </CardHeader>
 
-        <CardContent className="min-h-[200px] md:min-h-[300px] flex flex-col items-center justify-center p-4 md:p-6 relative overflow-hidden border-t border-b border-slate-200/50 dark:border-slate-700/50">
-          {isEditingCard && currentCard ? (
-            <div className="w-full space-y-4 bg-card">
-              <div>
-                <Label htmlFor="editQuestion" className="text-sm md:text-base font-medium">Question</Label>
-                <Textarea 
-                  id="editQuestion" 
-                  value={editQuestion} 
-                  onChange={(e) => setEditQuestion(e.target.value)} 
-                  className="mt-2 min-h-[80px] bg-white/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-700/50 focus:border-blue-500 dark:focus:border-blue-400 transition-colors" 
-                  disabled={isSavingEdit} 
-                />
-              </div>
-              <div>
-                <Label htmlFor="editAnswer" className="text-sm md:text-base font-medium">Answer</Label>
-                <Textarea 
-                  id="editAnswer" 
-                  value={editAnswer} 
-                  onChange={(e) => setEditAnswer(e.target.value)} 
-                  className="mt-2 min-h-[80px] bg-white/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-700/50 focus:border-blue-500 dark:focus:border-blue-400 transition-colors" 
-                  disabled={isSavingEdit} 
-                />
-              </div>
+        <CardContent className="min-h-[200px] md:min-h-[300px] flex flex-col items-center justify-center p-4 md:p-6 relative overflow-hidden border-t border-b">
+          <div className="w-full text-center space-y-4">
+            <div className="text-lg md:text-xl lg:text-2xl font-medium mb-4">
+              {isShowingAnswer ? currentCard?.answer : currentCard?.question}
             </div>
-          ) : (
-            <div className="w-full text-center space-y-4">
-              <div className="text-lg md:text-xl lg:text-2xl font-medium">
-                {isShowingAnswer ? currentCard?.answer : currentCard?.question}
+            {currentCard && (
+              <div className="text-sm text-muted-foreground flex items-center justify-center gap-2">
+                <span className="px-2 py-1 rounded-full bg-muted text-xs">
+                  From: {setTitles[currentCard.set_id] || "Unknown Set"}
+                </span>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </CardContent>
 
         {isStudyModeActive && currentCard ? (
@@ -817,7 +796,7 @@ export default function StudyFlashcardSetPage() {
             <Button 
               variant="link" 
               onClick={handleFlipCard} 
-              className="mt-2 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+              className="mt-2"
             >
               {isShowingAnswer ? "View Question" : "View Answer"}
             </Button>
@@ -829,14 +808,14 @@ export default function StudyFlashcardSetPage() {
                 <Button 
                   variant="outline" 
                   onClick={handleFlipCard}
-                  className="flex-1 sm:flex-none bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:bg-white dark:hover:bg-slate-800 transition-all duration-200"
+                  className="flex-1 sm:flex-none"
                 >
                   {isShowingAnswer ? "Show Question" : "Show Answer"}
                 </Button>
                 <Button 
                   variant="outline" 
                   onClick={handleShuffleCards}
-                  className="flex-1 sm:flex-none bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:bg-white dark:hover:bg-slate-800 transition-all duration-200"
+                  className="flex-1 sm:flex-none"
                 >
                   <RefreshCwIcon className="mr-2 h-4 w-4" /> Shuffle
                 </Button>
@@ -844,42 +823,9 @@ export default function StudyFlashcardSetPage() {
               <div className="flex gap-2 w-full sm:w-auto">
                 <Button 
                   variant="outline" 
-                  onClick={() => setIsEditingCard(true)}
-                  className="flex-1 sm:flex-none bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:bg-white dark:hover:bg-slate-800 transition-all duration-200"
-                >
-                  <Edit className="mr-2 h-4 w-4" /> Edit
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button 
-                      variant="destructive"
-                      className="flex-1 sm:flex-none"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" /> Delete
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Flashcard</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Are you sure you want to delete this flashcard? This action cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleDeleteCard} className="bg-destructive">
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-              <div className="flex gap-2 w-full sm:w-auto">
-                <Button 
-                  variant="outline" 
                   onClick={() => handleNavigateCard('prev')} 
                   disabled={currentCardIndex === 0}
-                  className="flex-1 sm:flex-none bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:bg-white dark:hover:bg-slate-800 transition-all duration-200"
+                  className="flex-1 sm:flex-none"
                 >
                   <ArrowLeftIcon className="mr-2 h-4 w-4" /> Previous
                 </Button>
@@ -887,7 +833,7 @@ export default function StudyFlashcardSetPage() {
                   variant="outline" 
                   onClick={() => handleNavigateCard('next')} 
                   disabled={currentCardIndex === studySessionCards.length - 1}
-                  className="flex-1 sm:flex-none bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:bg-white dark:hover:bg-slate-800 transition-all duration-200"
+                  className="flex-1 sm:flex-none"
                 >
                   Next <ArrowRightIcon className="ml-2 h-4 w-4" />
                 </Button>
@@ -895,169 +841,7 @@ export default function StudyFlashcardSetPage() {
             </div>
           </CardFooter>
         )}
-
-        {isEditingCard && currentCard && (
-          <CardFooter className="flex justify-end gap-2 pt-6 border-t border-slate-200/50 dark:border-slate-700/50">
-            <Button 
-              variant="outline" 
-              onClick={() => setIsEditingCard(false)} 
-              disabled={isSavingEdit}
-              className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:bg-white dark:hover:bg-slate-800 transition-all duration-200"
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleSaveEdit} 
-              disabled={isSavingEdit}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02] disabled:scale-100 disabled:opacity-50"
-            >
-              {isSavingEdit ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              Save Changes
-            </Button>
-          </CardFooter>
-        )}
       </Card>
-
-      <div className="mt-6 text-center">
-        <Button 
-          onClick={() => router.push(setId ? `/flashcards/set/${setId}/add-card` : '/flashcards/create')}
-          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02]"
-        >
-          <PlusCircle className="mr-2 h-4 w-4" /> Add New Card
-        </Button>
-      </div>
-
-      {/* Add Study Report Dialog */}
-      {studyReport && !isStudyModeActive && (
-        <AlertDialog open={!!studyReport} onOpenChange={(open) => { 
-          if(!open) {
-            setStudyReport(null); 
-            setChartData(null); 
-            setChallengingCardsList([]);
-            setSessionHistoryForChart(null);
-          }
-        }}>
-          <AlertDialogContent className="max-w-2xl md:max-w-4xl">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-2xl">
-                Study Session Report: "{flashcardSetInfo?.title}"
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                Here's a breakdown of your recent review session.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-
-            <ScrollArea className="max-h-[70vh] pr-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 py-4">
-                {/* Column 1: Donut and Mastery */}
-                <div className="space-y-6">
-                  {chartData && chartData.length > 0 && (
-                    <TremorCard>
-                      <Title>This Session's Performance</Title>
-                      <DonutChart
-                        className="mt-6 h-48 sm:h-60"
-                        data={chartData}
-                        category="count"
-                        index="name"
-                        colors={chartData.map(d => d.color.split('-')[0]) as any}
-                        valueFormatter={(number: number) => `${number} card${number !== 1 ? 's' : ''}`}
-                      />
-                    </TremorCard>
-                  )}
-                  <TremorCard>
-                    <Title>Current Set Mastery</Title>
-                    <Text>{`Based on all ${allCardsInSet.length} cards in "${flashcardSetInfo?.title}".`}</Text>
-                    <ProgressBar 
-                      value={currentSetMasteryPercentage} 
-                      color={currentSetMasteryPercentage >= 80 ? "emerald" : 
-                             currentSetMasteryPercentage >= 50 ? "blue" : 
-                             currentSetMasteryPercentage >= 25 ? "amber" : "rose"} 
-                      className="mt-3 h-2"
-                    />
-                    <Text className="text-center mt-1 text-lg font-medium">
-                      {currentSetMasteryPercentage}% Mastered
-                    </Text>
-                    <Text className="text-center text-xs text-muted-foreground">
-                      (Mastery = card interval &gt; 3 weeks, or &gt; 3 good reps &amp; interval &gt; 1 week)
-                    </Text>
-                  </TremorCard>
-                </div>
-
-                {/* Column 2: Performance Trend Chart */}
-                <div className="space-y-6">
-                  {sessionHistoryForChart && sessionHistoryForChart.length >= 2 ? (
-                    <TremorCard>
-                      <Title>Mastery Trend Over Time</Title>
-                      <Text>Your progress across recent study sessions for this set.</Text>
-                      <AreaChart
-                        className="mt-4 h-60"
-                        data={sessionHistoryForChart}
-                        index="date"
-                        categories={["Overall Mastery (%)", "Good/Easy Cards (%)"]}
-                        colors={["emerald", "blue"]}
-                        yAxisWidth={35}
-                        valueFormatter={(number: number) => `${number}%`}
-                        showLegend={true}
-                      />
-                    </TremorCard>
-                  ) : (
-                    <TremorCard className="flex flex-col items-center justify-center h-full min-h-[200px]">
-                      <InfoIcon className="w-10 h-10 text-muted-foreground mb-2"/>
-                      <Title>Mastery Trend</Title>
-                      <Text className="text-center">Complete more study sessions for this set to see your progress over time!</Text>
-                    </TremorCard>
-                  )}
-                </div>
-              </div>
-
-              {/* AI Textual Report */}
-              <TremorCard className="mt-6">
-                <Title>Nova's Insights & Tips</Title>
-                <div className="mt-2 prose prose-sm dark:prose-invert max-w-none">
-              <ChatMessageContentRenderer content={studyReport} />
-                </div>
-              </TremorCard>
-
-              {/* Challenging Cards List */}
-              {challengingCardsList.length > 0 && (
-                <TremorCard className="mt-6">
-                  <Title>Cards to Focus On ({challengingCardsList.length})</Title>
-                  <Text>These are questions you found challenging in this session:</Text>
-                  <ScrollArea className="max-h-40 mt-2">
-                    <List className="mt-2">
-                      {challengingCardsList.map((card, idx) => (
-                        <ListItem key={idx} className="truncate">
-                          <div className="flex items-center justify-between w-full">
-                            <span className="text-sm">{card.question}</span>
-                            <span className={`ml-2 text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${
-                              card.quality === "Again" 
-                                ? "bg-red-100 text-red-700 dark:bg-red-700/30 dark:text-red-300"
-                                : "bg-orange-100 text-orange-700 dark:bg-orange-700/30 dark:text-orange-300"
-                            }`}>
-                              {card.quality}
-                            </span>
-                          </div>
-                        </ListItem>
-                      ))}
-                    </List>
-                  </ScrollArea>
-                </TremorCard>
-              )}
-            </ScrollArea>
-
-            <AlertDialogFooter className="mt-4">
-              <AlertDialogAction onClick={() => { 
-                setStudyReport(null); 
-                setChartData(null); 
-                setChallengingCardsList([]);
-                setSessionHistoryForChart(null);
-              }}>
-                Great, Got It!
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
     </div>
   );
 }
