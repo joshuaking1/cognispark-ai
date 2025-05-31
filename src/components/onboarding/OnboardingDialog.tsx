@@ -191,7 +191,7 @@ export default function OnboardingDialog({ open, onOpenChange, onComplete }: Onb
           date_of_birth: formData.date_of_birth || null,
           grade_level: formData.grade_level === "not_specified" ? null : formData.grade_level,
           subjects_of_interest: formData.subjects_of_interest,
-          onboarding_completed: true,
+          has_completed_onboarding: true,
         })
         .eq('id', session.user.id);
 
