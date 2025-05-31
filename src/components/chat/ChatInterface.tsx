@@ -47,7 +47,7 @@ interface Conversation {
 
 // Web Speech API instances
 let recognition: SpeechRecognition | null = null;
-let speechSynthesisUtterance: SpeechSynthesisUtterance | null = null;
+// let speechSynthesisUtterance: SpeechSynthesisUtterance | null = null; // Removed
 
 export default function ChatInterface() {
   const [isVoiceInputActive, setIsVoiceInputActive] = useState(false);
@@ -64,7 +64,10 @@ export default function ChatInterface() {
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [isTTSEnabled, setIsTTSEnabled] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [audioQueue, setAudioQueue] = useState<string[]>([]);
+  const [isProcessingQueue, setIsProcessingQueue] = useState(false);
   const scrollArea = scrollAreaRef.current;
+  const audioRef = useRef<HTMLAudioElement | null>(null); // For playing audio stream
 
   // Vercel AI SDK's useChat hook
   const {
@@ -88,9 +91,9 @@ export default function ChatInterface() {
         setCurrentConversationId(newConversationId);
       }
     },
-    onFinish: (message) => {
-      if (isTTSEnabled && message.role === "assistant" && message.content) {
-        speakText(message.content);
+    onFinish: async (message) => {
+      if (isTTSEnabled && message.role === 'assistant' && message.content) {
+        await playNovaResponse(message.content);
       }
       
       const activeConversationId = currentConversationId || messages.find(m=>m.role==='assistant')?.id;
@@ -124,6 +127,8 @@ export default function ChatInterface() {
 
   // Handle URL search parameters and conversation selection
   useEffect(() => {
+    if (typeof window === 'undefined') return; // Skip during SSR
+
     const urlSearchParams = new URLSearchParams(window.location.search);
     const prefillMessage = urlSearchParams.get('prefill');
     const requestedConversationId = urlSearchParams.get('conversationId');
@@ -149,7 +154,7 @@ export default function ChatInterface() {
       const currentPath = window.location.pathname;
       router.replace(currentPath, { scroll: false }); // Clean URL
     }
-  }, [searchParams, conversations, router, setInput]); // Removed currentConversationId, handleNewConversation, selectConversation from deps to avoid loops
+  }, [searchParams, conversations, router, setInput]); // Removed window.location.search from deps
 
   // Function to select a conversation
   const selectConversation = useCallback(async (conversationId: string) => {
@@ -293,7 +298,10 @@ export default function ChatInterface() {
     }
     return () => {
       if (recognition && isListening) recognition.stop();
-      if (speechSynthesis?.speaking) speechSynthesis.cancel();
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
     };
   }, [setInput, isListening]);
 
@@ -316,33 +324,124 @@ export default function ChatInterface() {
     }
   };
 
-  const speakText = (textToSpeak: string) => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      if (speechSynthesis.speaking) speechSynthesis.cancel();
-      speechSynthesisUtterance = new SpeechSynthesisUtterance(textToSpeak);
-      speechSynthesisUtterance.onstart = () => setIsSpeaking(true);
-      speechSynthesisUtterance.onend = () => setIsSpeaking(false);
-      speechSynthesisUtterance.onerror = () => {
-        toast.error("TTS Error", { description: "Could not play audio." });
+  const playNovaResponse = async (textToSpeak: string) => {
+    if (isSpeaking) { // If already speaking, stop previous
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = ""; // Detach source
+      }
+      setIsSpeaking(false);
+    }
+
+    setIsSpeaking(true);
+    try {
+      const response = await fetch('/api/tts/nova-speak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: textToSpeak }),
+      });
+
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type');
+        if (contentType?.includes('application/json')) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `TTS service failed with status ${response.status}`);
+        } else {
+          throw new Error(`TTS service failed with status ${response.status}`);
+        }
+      }
+
+      if (!response.body) {
+        throw new Error('No audio data received from TTS service');
+      }
+
+      // Create an Audio element to play the stream
+      if (!audioRef.current) {
+        audioRef.current = new Audio();
+      }
+      const audio = audioRef.current;
+      
+      // Get a reader from the response body stream
+      const reader = response.body.getReader();
+      // Create a new ReadableStream from the reader to build up the blob URL
+      const stream = new ReadableStream({
+        start(controller) {
+          function push() {
+            reader.read().then(({ done, value }) => {
+              if (done) {
+                controller.close();
+                return;
+              }
+              controller.enqueue(value);
+              push();
+            }).catch(error => {
+              console.error("Error reading TTS stream:", error);
+              controller.error(error);
+            });
+          }
+          push();
+        }
+      });
+
+      // Create a new response from the stream to get a Blob
+      const blobResponse = new Response(stream);
+      const blob = await blobResponse.blob(); // Get the entire audio as a blob
+      const audioUrl = URL.createObjectURL(blob); // Create a URL for the blob
+
+      audio.src = audioUrl;
+      audio.play()
+        .catch(e => {
+            console.error("Audio play error:", e);
+            toast.error("Playback Error", { 
+              description: "Could not play Nova's voice. Please check your browser's audio settings."
+            });
+            setIsSpeaking(false);
+        });
+
+      audio.onended = () => {
         setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl); // Clean up blob URL
       };
-      speechSynthesis.speak(speechSynthesisUtterance);
-    } else {
-      toast.error("Text-to-speech is not supported.");
+      audio.onerror = (e) => {
+        console.error("Audio element error:", e);
+        toast.error("Audio Error", { 
+          description: "An error occurred with Nova's voice playback. Please try again."
+        });
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl); // Clean up
+      };
+
+    } catch (error: any) {
+      console.error("playNovaResponse error:", error);
+      toast.error("TTS Failed", { 
+        description: error.message || "Could not generate Nova's voice. Please try again."
+      });
+      setIsSpeaking(false);
     }
   };
 
   const toggleTTS = () => {
     setIsTTSEnabled(prev => {
       const newState = !prev;
-      if (!newState && speechSynthesis?.speaking) {
-        speechSynthesis.cancel();
+      if (!newState && audioRef.current && !audioRef.current.paused) {
+        audioRef.current.pause();
+        audioRef.current.src = ""; // Detach source
         setIsSpeaking(false);
       }
-      toast.info(newState ? "Nova's voice enabled" : "Nova's voice disabled");
+      toast.info(newState ? "Nova's premium voice enabled" : "Nova's voice disabled");
       return newState;
     });
   };
+
+  // Cleanup audio element on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+      }
+    };
+  }, []);
 
   const handleNewConversation = () => {
     loadMessagesForSelectedConvo(null);

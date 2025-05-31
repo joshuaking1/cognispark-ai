@@ -14,6 +14,7 @@ import { Loader2, UploadCloud, UserCircle2, KeyRound, Edit3, BookOpen, CalendarD
 import type { User } from "@supabase/supabase-js";
 import { updateUserProfile, uploadAvatarAction, changeUserPasswordAction, deleteAccountAction } from "@/app/actions/userSettingsActions";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TagInput, type Tag as TagType } from "@/components/ui/tag-input";
 
 import {
   AlertDialog,
@@ -33,6 +34,7 @@ interface ProfileData {
   date_of_birth: string | null;
   grade_level: string | null;
   subjects_of_interest: string[];
+  learning_goals: string[];
 }
 
 const gradeLevels = [
@@ -60,6 +62,7 @@ export default function SettingsPage() {
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [learningGoalsInput, setLearningGoalsInput] = useState<TagType[]>([]);
 
   const handleDeleteAccount = async () => {
     try {
@@ -107,7 +110,7 @@ export default function SettingsPage() {
 
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('full_name, avatar_url, date_of_birth, grade_level, subjects_of_interest')
+        .select('full_name, avatar_url, date_of_birth, grade_level, subjects_of_interest, learning_goals')
         .eq('id', session.user.id)
         .single();
 
@@ -120,11 +123,15 @@ export default function SettingsPage() {
         setDobInput(profileData.date_of_birth || "");
         setGradeLevelInput(profileData.grade_level || "Not Specified");
         setSubjectsInput((profileData.subjects_of_interest as string[] || []).join(", "));
+        setLearningGoalsInput(
+          (profileData.learning_goals as string[] || []).map(goal => ({ id: goal, text: goal }))
+        );
       } else {
-        // No profile yet, but user exists (e.g. profile creation trigger failed or is delayed)
+        // No profile yet, but user exists
         setFullNameInput("");
         setAvatarPreviewUrl(null);
         setGradeLevelInput("Not Specified");
+        setLearningGoalsInput([]);
       }
       setIsLoadingPage(false);
     };
@@ -163,18 +170,28 @@ export default function SettingsPage() {
       toast.error("Not Authenticated", { description: "Please log in again." });
       return;
     }
+
     const subjectsArray = subjectsInput.split(',').map(s => s.trim()).filter(s => s.length > 0);
+    const goalsArray = learningGoalsInput.map(tag => tag.text.trim()).filter(goal => goal.length > 0);
+
     const currentSubjects = (profile?.subjects_of_interest as string[] || []);
+    const currentGoals = (profile?.learning_goals as string[] || []);
+
     const subjectsChanged = subjectsArray.length !== currentSubjects.length ||
                             !subjectsArray.every(subject => currentSubjects.includes(subject));
+    const goalsChanged = goalsArray.length !== currentGoals.length ||
+                        !goalsArray.every(goal => currentGoals.includes(goal));
+
     if (fullNameInput.trim() === (profile?.full_name || "") &&
         dobInput === (profile?.date_of_birth || "") &&
         gradeLevelInput === (profile?.grade_level || "Not Specified") &&
-        !subjectsChanged
+        !subjectsChanged &&
+        !goalsChanged
     ) {
         toast.info("No changes made to profile details.");
         return;
     }
+
     setIsSavingProfile(true);
     try {
       const payload = {
@@ -182,6 +199,7 @@ export default function SettingsPage() {
         date_of_birth: dobInput === "" ? null : dobInput,
         grade_level: gradeLevelInput === "Not Specified" ? null : gradeLevelInput,
         subjects_of_interest: subjectsArray,
+        learning_goals: goalsArray,
       };
       const result = await updateUserProfile(payload as any);
       if (result.success) {
@@ -192,6 +210,7 @@ export default function SettingsPage() {
             date_of_birth: payload.date_of_birth,
             grade_level: payload.grade_level,
             subjects_of_interest: payload.subjects_of_interest,
+          learning_goals: payload.learning_goals,
         }));
       } else {
         toast.error(result.error || "Profile Update Failed");
@@ -389,6 +408,30 @@ export default function SettingsPage() {
                     />
                     <p className="text-xs text-muted-foreground">Enter subjects separated by commas.</p>
                 </div>
+            </div>
+            {/* New Section: Learning Goals */}
+            <div className="pt-4 space-y-2">
+              <h4 className="text-lg font-medium flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-target mr-2 text-primary"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                My Learning Goals
+              </h4>
+              <p className="text-sm text-muted-foreground">
+                What are you aiming to achieve? (e.g., "Pass Algebra exam", "Learn basics of Python", "Write better essays"). Add up to 3 main goals.
+              </p>
+              <TagInput
+                tags={learningGoalsInput}
+                setTags={(newTags) => {
+                  if (newTags.length <= 3) {
+                    setLearningGoalsInput(newTags);
+                  } else {
+                    toast.info("You can set a maximum of 3 learning goals.");
+                  }
+                }}
+                placeholder="Enter a goal and press Enter..."
+                maxTags={3}
+                className="mt-1"
+                disabled={isSavingProfile}
+              />
             </div>
             <Button type="submit" disabled={isSavingProfile} className="w-full sm:w-auto">
               {isSavingProfile ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

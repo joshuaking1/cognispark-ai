@@ -3,6 +3,7 @@
 import Groq from "groq-sdk";
 import { createSupabaseServerActionClient } from "@/lib/supabase/server";
 import type { LearningPlan, LearningPlanItem } from "@/components/dashboard/LearningPlanGenerator";
+import { revalidatePath } from "next/cache";
 
 const groqApiKey = process.env.GROQ_API_KEY;
 if (!groqApiKey) console.error("CRITICAL: GROQ_API_KEY for learning plan is not set.");
@@ -74,21 +75,18 @@ function cleanAndValidateJsonString(jsonString: string): string {
 }
 
 export async function generateLearningPlanAction(
-  userGoal?: string
+  currentUserGoalInput?: string // This is the optional, session-specific goal from the dashboard input
 ): Promise<PlanGenerationResult> {
   if (!groq) return { success: false, error: "AI Service not configured." };
 
   const supabase = createSupabaseServerActionClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return { success: false, error: "User not authenticated." };
 
-  if (authError || !user) {
-    return { success: false, error: "User not authenticated." };
-  }
-
-  // Fetch user's profile for personalization
+  // Fetch user's profile including grade, subjects, AND saved learning_goals
   const { data: profileData } = await supabase
     .from('profiles')
-    .select('grade_level, subjects_of_interest, date_of_birth')
+    .select('grade_level, subjects_of_interest, date_of_birth, learning_goals')
     .eq('id', user.id)
     .single();
 
@@ -107,18 +105,26 @@ export async function generateLearningPlanAction(
     if (profileData.subjects_of_interest && (profileData.subjects_of_interest as string[]).length > 0) {
       personalizationContext += ` Their stated subjects of interest are: ${(profileData.subjects_of_interest as string[]).join(", ")}.`;
     }
+    // Add learning goals to personalization context
+    if (profileData.learning_goals && (profileData.learning_goals as string[]).length > 0) {
+      personalizationContext += ` Their overarching learning goals include: ${(profileData.learning_goals as string[]).join("; ")}.`;
+    }
   }
 
-  let goalContext = "Their current goal is to get general learning suggestions tailored to their profile.";
-  if (userGoal && userGoal.trim() !== "") {
-    goalContext = `Their specific learning goal is: "${userGoal.trim()}".`;
+  let goalContext = "";
+  if (currentUserGoalInput && currentUserGoalInput.trim() !== "") {
+    goalContext = `For this specific session, their immediate focus or goal is: "${currentUserGoalInput.trim()}". Please try to align the plan with this immediate focus while keeping their profile and overarching goals in mind.`;
+  } else if (profileData?.learning_goals && (profileData.learning_goals as string[]).length > 0) {
+    goalContext = `Their current overarching learning goals are: ${(profileData.learning_goals as string[]).join("; ")}. Generate a plan that helps them make progress on one or more of these.`;
+  } else {
+    goalContext = "They haven't specified an immediate goal for this session nor have overarching goals saved. Generate a general learning plan tailored to their profile (grade, subjects) to help them explore or reinforce learning.";
   }
 
   const prompt = `You are Nova, an expert AI learning coach.
 ${personalizationContext}
 ${goalContext}
 
-Based on this information, generate a concise and actionable learning plan with 3 to 5 steps.
+Based on all this information, generate a concise and actionable learning plan with 3 to 5 steps.
 Each step should clearly guide the student on what to do. Steps can involve using features of CogniSpark AI or suggesting high-quality, free external resources.
 
 CRITICAL: Your response must be a valid JSON object with the following strict requirements:
@@ -220,4 +226,113 @@ Generate your response now, following this exact format. Remember to properly qu
     console.error("Groq Learning Plan Error:", error);
     return { success: false, error: `AI plan generation failed: ${error.message}` };
   }
+}
+
+export async function saveActiveLearningPlanAction(plan: LearningPlan): Promise<{ success: boolean; error?: string }> {
+  const supabase = createSupabaseServerActionClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return { success: false, error: "User not authenticated." };
+
+  try {
+    // Ensure we have a valid timestamp
+    const now = new Date();
+    if (isNaN(now.getTime())) {
+      throw new Error("Invalid timestamp generated");
+    }
+    const timestamp = now.toISOString();
+
+    // Ensure we have a valid plan
+    if (!plan || !Array.isArray(plan.steps)) {
+      throw new Error("Invalid learning plan structure");
+    }
+
+    // Log the data we're about to send
+    console.log('Saving plan with data:', {
+      active_learning_plan: plan,
+      active_plan_generated_at: timestamp,
+      active_plan_completed_steps: []
+    });
+
+    // Perform a single update with the new plan
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        active_learning_plan: plan,
+        active_plan_generated_at: timestamp,
+        active_plan_completed_steps: []
+      })
+      .eq("id", user.id);
+
+    if (error) { 
+      console.error("Error saving active plan:", error); 
+      console.error("Full error object:", JSON.stringify(error, null, 2));
+      return { success: false, error: error.message }; 
+    }
+
+    revalidatePath("/dashboard");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error in saveActiveLearningPlanAction:", error);
+    console.error("Full error object:", JSON.stringify(error, null, 2));
+    return { success: false, error: error.message };
+  }
+}
+
+export async function markLearningPlanStepAction(stepId: string, completed: boolean): Promise<{ success: boolean; error?: string }> {
+  const supabase = createSupabaseServerActionClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return { success: false, error: "User not authenticated." };
+
+  // Fetch current completed steps
+  const { data: profileData, error: fetchError } = await supabase
+    .from("profiles")
+    .select("active_plan_completed_steps")
+    .eq("id", user.id)
+    .single();
+
+  if (fetchError || !profileData) return { success: false, error: "Could not retrieve current plan."};
+
+  let completedSteps: string[] = (profileData.active_plan_completed_steps as string[] || []);
+  if (completed) {
+    if (!completedSteps.includes(stepId)) completedSteps.push(stepId);
+  } else {
+    completedSteps = completedSteps.filter(id => id !== stepId);
+  }
+
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update({ 
+      active_plan_completed_steps: completedSteps, 
+      updated_at: new Date().toISOString() 
+    })
+    .eq("id", user.id);
+
+  if (updateError) { 
+    console.error("Error marking step:", updateError); 
+    return { success: false, error: updateError.message };
+  }
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
+export async function clearActiveLearningPlanAction(): Promise<{ success: boolean; error?: string }> {
+  const supabase = createSupabaseServerActionClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return { success: false, error: "User not authenticated." };
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      active_learning_plan: null,
+      active_plan_generated_at: null,
+      active_plan_completed_steps: []
+    })
+    .eq("id", user.id);
+
+  if (error) { 
+    console.error("Error clearing active plan:", error);
+    return { success: false, error: error.message }; 
+  }
+  revalidatePath("/dashboard");
+  return { success: true };
 } 

@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "sonner";
 import {
   Loader2, 
   Lightbulb, 
@@ -28,6 +31,7 @@ import LearningPlanGenerator, { LearningPlan } from "@/components/dashboard/Lear
 import ChatMessageContentRenderer from "@/components/chat/ChatMessageContentRenderer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { updateUserProfile } from "@/app/actions/userSettingsActions";
+import { saveActiveLearningPlanAction, markLearningPlanStepAction, clearActiveLearningPlanAction } from "@/app/actions/learningPlanActions";
 import { motion, AnimatePresence } from "framer-motion";
 import OnboardingDialog from "@/components/onboarding/OnboardingDialog";
 
@@ -37,6 +41,8 @@ interface Profile {
   grade_level: string | null;
   subjects_of_interest: string[] | null;
   has_completed_onboarding: boolean | null;
+  active_learning_plan: LearningPlan | null;
+  active_plan_completed_steps: string[] | null;
 }
 
 interface User {
@@ -46,10 +52,10 @@ interface User {
 
 interface RecentActivity {
   id: string;
-  type: 'chat' | 'flashcard' | 'note';
+  type: 'flashcard' | 'chat' | 'quiz';
   title: string;
-  created_at: string;
-  preview?: string;
+  timestamp: string;
+  details?: string;
 }
 
 export default function DashboardPage() {
@@ -59,7 +65,8 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [learningPlan, setLearningPlan] = useState<LearningPlan | null>(null);
-  const [learningPlanError, setLearningPlanError] = useState<string | null>(null);
+  const [activePlan, setActivePlan] = useState<LearningPlan | null>(null);
+  const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   const supabase = createClientComponentClient();
@@ -75,61 +82,32 @@ export default function DashboardPage() {
         }
         setUser(session.user as User);
 
-        // Fetch profile
+        // Fetch profile with active plan
         const { data: profileData } = await supabase
-    .from('profiles')
-          .select('full_name, avatar_url, grade_level, subjects_of_interest, has_completed_onboarding')
+          .from('profiles')
+          .select('full_name, avatar_url, grade_level, subjects_of_interest, has_completed_onboarding, active_learning_plan, active_plan_completed_steps')
           .eq('id', session.user.id)
-    .single();
+          .single();
+        
         setProfile(profileData);
+        if (profileData?.active_learning_plan) {
+          setActivePlan(profileData.active_learning_plan as LearningPlan);
+          setCompletedSteps(profileData.active_plan_completed_steps || []);
+        } else {
+          setActivePlan(null);
+          setCompletedSteps([]);
+        }
 
         // Fetch recent activity
-        const [chatResult, flashcardResult, noteResult] = await Promise.all([
-          supabase
-            .from('conversations')
-            .select('id, title, created_at, last_message')
-            .eq('user_id', session.user.id)
-            .order('updated_at', { ascending: false })
-            .limit(3),
-          supabase
-            .from('flashcard_sets')
-            .select('id, title, created_at')
-            .eq('user_id', session.user.id)
-            .order('updated_at', { ascending: false })
-            .limit(3),
-          supabase
-            .from('smart_notes')
-            .select('id, title, created_at, content')
-            .eq('user_id', session.user.id)
-            .order('updated_at', { ascending: false })
-            .limit(3)
-        ]);
+        const { data: activityData } = await supabase
+          .from('recent_activity')
+          .select('*')
+          .eq('user_id', session.user.id)
+          .order('timestamp', { ascending: false })
+          .limit(5);
 
-        const activities: RecentActivity[] = [
-          ...(chatResult.data?.map(chat => ({
-            id: chat.id,
-            type: 'chat' as const,
-            title: chat.title,
-            created_at: chat.created_at,
-            preview: chat.last_message
-          })) || []),
-          ...(flashcardResult.data?.map(set => ({
-            id: set.id,
-            type: 'flashcard' as const,
-            title: set.title,
-            created_at: set.created_at
-          })) || []),
-          ...(noteResult.data?.map(note => ({
-            id: note.id,
-            type: 'note' as const,
-            title: note.title,
-            created_at: note.created_at,
-            preview: note.content?.substring(0, 100)
-          })) || [])
-        ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-         .slice(0, 5);
+        setRecentActivity(activityData || []);
 
-        setRecentActivity(activities);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -149,209 +127,351 @@ export default function DashboardPage() {
   }, [supabase, router]);
 
   useEffect(() => {
-    if (profile && profile.has_completed_onboarding === false && !isLoading) {
+    if (profile && !profile.has_completed_onboarding) {
       setShowOnboarding(true);
     }
-  }, [profile, isLoading]);
+  }, [profile]);
 
-  const handlePlanGenerated = (plan: LearningPlan | null, error?: string) => {
-    setLearningPlan(plan);
-    setLearningPlanError(error || null);
+  const handlePlanGenerated = async (plan: LearningPlan | null, error?: string) => {
+    if (error) { 
+      toast.error("Plan Error", { description: error }); 
+      return; 
+    }
+    if (plan) {
+      setLearningPlan(plan); // Show the newly generated plan
+    }
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
+  const handleActivatePlan = async () => {
+    if (!learningPlan) return;
+    const result = await saveActiveLearningPlanAction(learningPlan);
+    if (result.success) {
+      toast.success("Learning plan activated!");
+      setActivePlan(learningPlan);
+      setCompletedSteps([]);
+      setLearningPlan(null);
+    } else {
+      toast.error("Failed to activate plan", { description: result.error });
+    }
   };
 
-  const handleOnboardingComplete = async () => {
-    setShowOnboarding(false);
-    if (user) {
-      try {
-        await updateUserProfile({ has_completed_onboarding: true });
-      } catch (e) {
-        console.error("Failed to update onboarding status:", e);
-      }
+  const handleClearActivePlan = async () => {
+    const result = await clearActiveLearningPlanAction();
+    if (result.success) {
+      setActivePlan(null);
+      setCompletedSteps([]);
+      toast.info("Active learning plan cleared.");
+    } else {
+      toast.error("Failed to clear plan", { description: result.error });
+    }
+  };
+
+  const toggleStepCompletion = async (stepId: string) => {
+    const isCurrentlyCompleted = completedSteps.includes(stepId);
+    const newCompletedStatus = !isCurrentlyCompleted;
+
+    // Optimistic UI update
+    const newCompletedSteps = newCompletedStatus
+      ? [...completedSteps, stepId]
+      : completedSteps.filter(id => id !== stepId);
+    setCompletedSteps(newCompletedSteps);
+
+    const result = await markLearningPlanStepAction(stepId, newCompletedStatus);
+    if (!result.success) {
+      toast.error("Failed to update step", { description: result.error });
+      // Revert optimistic update
+      setCompletedSteps(completedSteps);
     }
   };
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
 
   if (!user) {
-    return <div className="p-8 text-center">Redirecting to login...</div>;
+    return null;
   }
 
-  const features = [
-    {
-      title: "Chat with Nova",
-      description: "Ask questions and get instant help",
-      icon: <MessageSquare className="h-6 w-6" />,
-      href: "/chat"
-    },
-    {
-      title: "Smart Notes",
-      description: "Create and organize your study notes",
-      icon: <FileText className="h-6 w-6" />,
-      href: "/notes"
-    },
-    {
-      title: "Flashcards",
-      description: "Create and review flashcards",
-      icon: <Brain className="h-6 w-6" />,
-      href: "/flashcards"
-    },
-    {
-      title: "Study Resources",
-      description: "Access learning materials",
-      icon: <BookOpen className="h-6 w-6" />,
-      href: "/resources"
-    }
-  ];
+  // Determine which plan to display
+  const displayPlan = activePlan || learningPlan;
+  const isGeneratedPlanPendingActivation = learningPlan && !activePlan;
 
   return (
     <div className="flex flex-col gap-10 p-4 md:p-8">
       {/* Header Section */}
-      <div className="flex items-center justify-between">
+      <section className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-4">
           <Avatar className="h-16 w-16">
             <AvatarImage src={profile?.avatar_url || undefined} />
-            <AvatarFallback>{profile?.full_name?.[0] || user.email?.[0] || '?'}</AvatarFallback>
-            </Avatar>
+            <AvatarFallback>
+              {profile?.full_name?.charAt(0) || user.email?.charAt(0) || 'U'}
+            </AvatarFallback>
+          </Avatar>
           <div>
-            <h1 className="text-2xl font-bold">Welcome back, {profile?.full_name || 'Student'}!</h1>
+            <h1 className="text-2xl font-bold">
+              Welcome back, {profile?.full_name || user.email?.split('@')[0] || 'User'}!
+            </h1>
             <p className="text-muted-foreground">
-              {profile?.grade_level || 'Grade not set'} • {profile?.subjects_of_interest?.join(', ') || 'No subjects selected'}
+              {profile?.grade_level ? `Grade ${profile.grade_level}` : 'No grade level set'}
             </p>
           </div>
         </div>
-        <Button variant="outline" onClick={handleSignOut}>
-          <LogOut className="mr-2 h-4 w-4" /> Sign Out
-            </Button>
-      </div>
+        <div className="flex gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/settings">
+              <Settings className="mr-2 h-4 w-4" />
+              Settings
+            </Link>
+          </Button>
+          <Button variant="outline" onClick={() => supabase.auth.signOut()}>
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign Out
+          </Button>
+        </div>
+      </section>
 
       {/* Learning Plan Section */}
       <section>
         <Card className="shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl md:text-2xl flex items-center">
-              <Lightbulb className="mr-3 h-6 w-6 text-yellow-500" /> Your Personalized Learning Plan
+              <Lightbulb className="mr-3 h-6 w-6 text-yellow-500" />
+              {activePlan ? "Your Active Learning Plan" : "Generate a Learning Plan"}
             </CardTitle>
-            <CardDescription>
-              Tell Nova your current learning goal, or let it suggest a plan based on your profile.
-            </CardDescription>
+            {!activePlan && <CardDescription>Tell Nova your goal or let it suggest a plan.</CardDescription>}
           </CardHeader>
           <CardContent>
-            <LearningPlanGenerator onPlanGenerated={handlePlanGenerated} />
-            {learningPlanError && (
-              <p className="mt-4 text-sm text-destructive">{learningPlanError}</p>
+            {!activePlan && !learningPlan && (
+              <LearningPlanGenerator onPlanGenerated={handlePlanGenerated} />
             )}
-            {learningPlan && (
-              <div className="mt-6 pt-6 border-t">
-                {learningPlan.introduction && (
-                  <p className="mb-4 text-muted-foreground italic">{learningPlan.introduction}</p>
+
+            {displayPlan && (
+              <div className="mt-4 pt-4 border-t">
+                {displayPlan.introduction && (
+                  <p className="mb-4 text-muted-foreground italic">{displayPlan.introduction}</p>
                 )}
-                <h3 className="text-lg font-semibold mb-3">Here's your suggested plan:</h3>
+                <h3 className="text-lg font-semibold mb-3">
+                  {isGeneratedPlanPendingActivation ? "Suggested Plan (Not Active Yet):" : "Current Steps:"}
+                </h3>
                 <ul className="space-y-3">
-                  {learningPlan.steps.map((step) => (
-                    <li key={step.id} className="p-3 border rounded-md bg-muted/30 hover:bg-muted/50 transition-colors">
-                      <strong className="font-medium text-primary">{step.title}</strong>
-                      {step.description && (
-                        <ChatMessageContentRenderer content={step.description} />
-                      )}
-                      {step.action_link && (
-                        <Button asChild variant="link" size="sm" className="px-0 h-auto mt-1">
-                          <Link href={step.action_link} target={step.action_link.startsWith('http') ? '_blank' : '_self'}>
-                            {step.action_link.startsWith('http') 
-                              ? `Go to ${step.resource_type || 'Resource'}`
-                              : "Let's do this!"}
-          </Link>
-            </Button>
-                      )}
-                    </li>
-                  ))}
+                  {displayPlan.steps.map((step) => {
+                    const isCompleted = completedSteps.includes(step.id);
+                    return (
+                      <li 
+                        key={step.id} 
+                        className={`p-3 border rounded-md transition-colors ${
+                          isCompleted 
+                            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700' 
+                            : 'bg-muted/30 hover:bg-muted/50'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          {activePlan === displayPlan && (
+                            <Checkbox
+                              id={`step-${step.id}`}
+                              checked={isCompleted}
+                              onCheckedChange={() => toggleStepCompletion(step.id)}
+                              className="mt-1"
+                            />
+                          )}
+                          <div className="flex-grow">
+                            <Label 
+                              htmlFor={`step-${step.id}`} 
+                              className={`font-medium text-primary cursor-pointer ${
+                                isCompleted ? 'line-through text-muted-foreground' : ''
+                              }`}
+                            >
+                              {step.title}
+                            </Label>
+                            {step.description && (
+                              <div className={`text-sm mt-1 ${
+                                isCompleted ? 'text-muted-foreground' : 'text-foreground/80'
+                              }`}>
+                                <ChatMessageContentRenderer content={step.description} />
+                              </div>
+                            )}
+                            {step.action_link && (
+                              <Button 
+                                asChild 
+                                variant="link" 
+                                size="sm" 
+                                className="px-0 h-auto mt-1 text-xs"
+                              >
+                                <Link 
+                                  href={step.action_link} 
+                                  target={step.action_link.startsWith('http') ? '_blank' : '_self'}
+                                >
+                                  {step.action_link.startsWith('http') 
+                                    ? `Go to ${step.resource_type || 'Resource'}` 
+                                    : "Let's do this!"}
+                                </Link>
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
                 </ul>
-                {learningPlan.conclusion && (
-                  <p className="mt-4 text-muted-foreground italic">{learningPlan.conclusion}</p>
+                {displayPlan.conclusion && (
+                  <p className="mt-4 text-muted-foreground italic">{displayPlan.conclusion}</p>
                 )}
-        </div>
+
+                {isGeneratedPlanPendingActivation && learningPlan && (
+                  <div className="mt-6 flex gap-2">
+                    <Button onClick={handleActivatePlan}>
+                      <Sparkles className="mr-2 h-4"/>Activate This Plan
+                    </Button>
+                    <Button variant="outline" onClick={() => setLearningPlan(null)}>
+                      Dismiss Suggestion
+                    </Button>
+                  </div>
+                )}
+                {activePlan && !learningPlan && (
+                  <Button 
+                    variant="outline" 
+                    onClick={handleClearActivePlan} 
+                    className="mt-6"
+                  >
+                    Clear Active Plan & Generate New
+                  </Button>
+                )}
+              </div>
             )}
           </CardContent>
         </Card>
       </section>
 
       {/* Quick Access Features */}
-      <section>
-        <h2 className="text-xl font-semibold mb-4">Quick Access</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {features.map((feature) => (
-            <Link key={feature.title} href={feature.href}>
-              <Card className="h-full hover:bg-muted/50 transition-colors">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                      {feature.icon}
-                    </div>
-                    <div>
-                      <h3 className="font-medium">{feature.title}</h3>
-                      <p className="text-sm text-muted-foreground">{feature.description}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="hover:shadow-md transition-shadow">
+          <Link href="/flashcards" className="block p-6">
+            <CardHeader className="p-0">
+              <CardTitle className="text-lg flex items-center">
+                <BookOpen className="mr-2 h-5 w-5 text-blue-500" />
+                Flashcards
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 mt-2">
+              <p className="text-sm text-muted-foreground">
+                Review and create flashcards
+              </p>
+            </CardContent>
+          </Link>
+        </Card>
+
+        <Card className="hover:shadow-md transition-shadow">
+          <Link href="/chat" className="block p-6">
+            <CardHeader className="p-0">
+              <CardTitle className="text-lg flex items-center">
+                <MessageSquare className="mr-2 h-5 w-5 text-green-500" />
+                Chat with Nova
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 mt-2">
+              <p className="text-sm text-muted-foreground">
+                Ask questions and get help
+              </p>
+            </CardContent>
+          </Link>
+        </Card>
+
+        <Card className="hover:shadow-md transition-shadow">
+          <Link href="/quiz" className="block p-6">
+            <CardHeader className="p-0">
+              <CardTitle className="text-lg flex items-center">
+                <FileText className="mr-2 h-5 w-5 text-purple-500" />
+                Take a Quiz
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 mt-2">
+              <p className="text-sm text-muted-foreground">
+                Test your knowledge
+              </p>
+            </CardContent>
+          </Link>
+        </Card>
+
+        <Card className="hover:shadow-md transition-shadow">
+          <Link href="/settings" className="block p-6">
+            <CardHeader className="p-0">
+              <CardTitle className="text-lg flex items-center">
+                <Settings className="mr-2 h-5 w-5 text-gray-500" />
+                Settings
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0 mt-2">
+              <p className="text-sm text-muted-foreground">
+                Manage your preferences
+              </p>
+            </CardContent>
+          </Link>
+        </Card>
       </section>
 
       {/* Recent Activity */}
-        <section>
-        <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
+      <section>
         <Card>
-          <CardContent className="p-0">
-            <ScrollArea className="h-[300px]">
+          <CardHeader>
+            <CardTitle className="text-xl">Recent Activity</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[300px] pr-4">
               {recentActivity.length > 0 ? (
-                <div className="divide-y">
+                <div className="space-y-4">
                   {recentActivity.map((activity) => (
-                    <div key={activity.id} className="p-4 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3">
-                          {activity.type === 'chat' && <MessageSquare className="h-5 w-5 text-blue-500" />}
-                          {activity.type === 'flashcard' && <Brain className="h-5 w-5 text-green-500" />}
-                          {activity.type === 'note' && <FileText className="h-5 w-5 text-purple-500" />}
-                      <div>
-                            <h3 className="font-medium">{activity.title}</h3>
-                            {activity.preview && (
-                              <p className="text-sm text-muted-foreground line-clamp-2">{activity.preview}</p>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Clock className="h-4 w-4" />
-                          {new Date(activity.created_at).toLocaleDateString()}
-                        </div>
+                    <div key={activity.id} className="flex items-start gap-4 p-3 rounded-lg bg-muted/30">
+                      <div className="mt-1">
+                        {activity.type === 'flashcard' && <BookOpen className="h-5 w-5 text-blue-500" />}
+                        {activity.type === 'chat' && <MessageSquare className="h-5 w-5 text-green-500" />}
+                        {activity.type === 'quiz' && <FileText className="h-5 w-5 text-purple-500" />}
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium">{activity.title}</h4>
+                        {activity.details && (
+                          <p className="text-sm text-muted-foreground mt-1">{activity.details}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {new Date(activity.timestamp).toLocaleString()}
+                        </p>
                       </div>
                     </div>
-            ))}
-          </div>
+                  ))}
+                </div>
               ) : (
-                <div className="p-8 text-center text-muted-foreground">
-                  No recent activity to show.
+                <div className="text-center text-muted-foreground py-8">
+                  No recent activity
                 </div>
               )}
             </ScrollArea>
           </CardContent>
         </Card>
-        </section>
+      </section>
 
-      {/* Replace Welcome Modal with Onboarding Dialog */}
-      <OnboardingDialog 
-        isOpen={showOnboarding} 
-        onClose={handleOnboardingComplete} 
+      {/* Onboarding Dialog */}
+      <OnboardingDialog
+        open={showOnboarding}
+        onOpenChange={setShowOnboarding}
+        onComplete={async (data) => {
+          const result = await updateUserProfile({
+            fullName: data.fullName,
+            dateOfBirth: data.dateOfBirth,
+            gradeLevel: data.gradeLevel,
+            subjectsOfInterest: data.subjectsOfInterest,
+            hasCompletedOnboarding: true
+          });
+          
+          if (result.success) {
+            setProfile(prev => prev ? { ...prev, ...data, has_completed_onboarding: true } : null);
+            toast.success("Profile updated successfully!");
+          } else {
+            toast.error("Failed to update profile", { description: result.error });
+          }
+        }}
       />
     </div>
   );

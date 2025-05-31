@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 
 // Import Cloudinary SDK
 import { v2 as cloudinary } from 'cloudinary';
+import { UploadApiResponse } from 'cloudinary';
 
 // Configure Cloudinary (should ideally be done once, e.g. in a config file)
 // This configuration will use environment variables set on Vercel/locally
@@ -29,6 +30,7 @@ interface UpdateProfilePayload {
   date_of_birth?: string | null; // YYYY-MM-DD string, allow null
   grade_level?: string | null;   // Allow null
   subjects_of_interest?: string[]; // Array of strings
+  learning_goals?: string[]; // New field for learning goals
   has_completed_onboarding?: boolean; // New field
 }
 
@@ -59,7 +61,7 @@ export async function updateUserProfile(
     if (payload.fullName !== null && payload.fullName.trim().length < 2 && payload.fullName.trim().length !== 0) {
       return { success: false, error: "Full name must be at least 2 characters or empty to clear." };
     }
-    updates.full_name = payload.fullName === null ? null : (payload.fullName.trim() === "" ? null : payload.fullName.trim());
+    updates.fullName = payload.fullName === null ? null : (payload.fullName.trim() === "" ? null : payload.fullName.trim());
     hasMeaningfulChanges = true;
   }
 
@@ -74,7 +76,13 @@ export async function updateUserProfile(
   }
 
   if (payload.subjects_of_interest !== undefined) {
-    updates.subjects_of_interest = payload.subjects_of_interest.length === 0 ? null : payload.subjects_of_interest;
+    updates.subjects_of_interest = payload.subjects_of_interest.length === 0 ? [] : payload.subjects_of_interest;
+    hasMeaningfulChanges = true;
+  }
+
+  if (payload.learning_goals !== undefined) {
+    // Ensure learning_goals is an array, even if empty
+    updates.learning_goals = Array.isArray(payload.learning_goals) ? payload.learning_goals : [];
     hasMeaningfulChanges = true;
   }
 
@@ -86,12 +94,14 @@ export async function updateUserProfile(
 
   // Check if any actual profile data fields were intended for update,
   // OR if only the onboarding status is being updated.
-  if (!hasMeaningfulChanges && payload.has_completed_onboarding === undefined) {
+  if (!hasMeaningfulChanges && payload.has_completed_onboarding === undefined && payload.learning_goals === undefined) {
     return { success: true, error: "No profile changes provided to update." }; // Using 'error' field for info message here, client can interpret
   }
-  // If only onboarding status changed, it's still a valid update.
-  if (!hasMeaningfulChanges && payload.has_completed_onboarding !== undefined && Object.keys(payload).length === 1) {
-     // This is fine, proceed with update just for onboarding status
+  // If only onboarding status or learning goals changed, it's still a valid update.
+  if (!hasMeaningfulChanges && 
+      (payload.has_completed_onboarding !== undefined || payload.learning_goals !== undefined) && 
+      Object.keys(payload).length === 1) {
+     // This is fine, proceed with update just for onboarding status or learning goals
   }
 
   const { data, error } = await supabase

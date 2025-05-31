@@ -45,12 +45,14 @@ interface FlashcardSetWithCards { // For sending to client
   title: string;
   description: string | null;
   flashcards: FlashcardForClient[];
-  user_id: string; // Good to have for ownership checks or other client logic
+  user_id: string;
   created_at: string;
   updated_at: string;
-  masteryPercentage: number; // Add mastery percentage
-  masteredCount: number; // Add count of mastered cards
-  totalCards: number; // Add total card count
+  // Stats fields
+  totalCards?: number;
+  learnedCards?: number;
+  dueTodayCount?: number;
+  masteryPercentage?: number;
 }
 
 interface GetSetResult {
@@ -135,71 +137,89 @@ interface SessionHistoryResult {
 }
 
 // --- New Action to Fetch a Flashcard Set and its Cards ---
-export async function getFlashcardSetDetailsAction(setId: string): Promise<ActionResult<FlashcardSetWithCards>> {
+export async function getFlashcardSetDetailsAction(setId: string): Promise<GetSetResult> {
   try {
     const supabase = createSupabaseServerComponentClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    // First verify the set exists and user has access
-    const { data: set, error: setError } = await supabase
-      .from('flashcard_sets')
-      .select('*')
-      .eq('id', setId)
+    if (authError || !user) {
+      return { success: false, error: "User not authenticated." };
+    }
+
+    if (!setId) {
+      return { success: false, error: "Set ID is required." };
+    }
+
+    // Fetch set data
+    const { data: setData, error: setError } = await supabase
+      .from("flashcard_sets")
+      .select("id, title, description, user_id, created_at, updated_at")
+      .eq("id", setId)
+      .eq("user_id", user.id)
       .single();
 
-    if (setError) {
-      console.error("Error fetching flashcard set:", setError);
-      if (setError.code === 'PGRST116') {
-        return { 
-          success: false, 
-          error: "Flashcard set not found. It may have been deleted or you don't have access to it." 
-        };
+    if (setError) throw setError;
+    if (!setData) return { success: false, error: "Flashcard set not found or access denied." };
+
+    // Fetch all flashcards for this set with their SRS data
+    const { data: allCardsData, error: cardsError } = await supabase
+      .from("flashcards")
+      .select("id, question, answer, due_date, interval, repetitions")
+      .eq("set_id", setId)
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true });
+
+    if (cardsError) throw cardsError;
+
+    const cardsForClient: FlashcardForClient[] = (allCardsData || []).map(c => ({
+      id: c.id,
+      question: c.question,
+      answer: c.answer,
+      due_date: c.due_date,
+      interval: c.interval,
+      repetitions: c.repetitions
+    }));
+
+    // Calculate Stats
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+
+    let learnedCount = 0;
+    let dueCount = 0;
+    let masteredCountForPercentage = 0;
+
+    (allCardsData || []).forEach(card => {
+      const cardDueDate = card.due_date ? new Date(card.due_date) : new Date(0);
+      if (cardDueDate < tomorrow) {
+        dueCount++;
       }
-      return { success: false, error: "Failed to fetch flashcard set" };
-    }
 
-    if (!set) {
-      return { 
-        success: false, 
-        error: "Flashcard set not found. It may have been deleted or you don't have access to it." 
-      };
-    }
-
-    const { data: flashcards, error: cardsError } = await supabase
-      .from('flashcards')
-      .select('*')
-      .eq('set_id', setId)
-      .order('created_at', { ascending: true });
-
-    if (cardsError) {
-      console.error("Error fetching flashcards:", cardsError);
-      return { success: false, error: "Failed to fetch flashcards" };
-    }
-
-    // Calculate mastery metrics
-    let masteredCount = 0;
-    const totalCards = flashcards?.length || 0;
-
-    flashcards?.forEach(card => {
-      // Define "mastered": interval > 21 days, or at least 3 good reps and interval >= 7 days
-      if (card.interval && card.interval >= 21) {
-        masteredCount++;
-      } else if (card.repetitions && card.repetitions >= 3 && card.interval && card.interval >= 7) {
-        masteredCount++;
+      const interval = card.interval ?? 0;
+      const repetitions = card.repetitions ?? 0;
+      if (interval >= 7 && repetitions >= 2) {
+        learnedCount++;
+      }
+      if (interval >= 21 || (repetitions >= 3 && interval >= 7)) {
+        masteredCountForPercentage++;
       }
     });
 
-    const masteryPercentage = totalCards > 0 ? Math.round((masteredCount / totalCards) * 100) : 0;
+    const totalCardsInSet = allCardsData?.length || 0;
+    const masteryPercentage = totalCardsInSet > 0 ? Math.round((masteredCountForPercentage / totalCardsInSet) * 100) : 0;
 
-    return {
-      success: true,
-      data: {
-        ...set,
-        flashcards: flashcards || [],
-        masteryPercentage,
-        masteredCount,
-        totalCards
-      }
+    const setWithCardsAndStats: FlashcardSetWithCards = {
+      ...setData,
+      flashcards: cardsForClient,
+      totalCards: totalCardsInSet,
+      learnedCards: learnedCount,
+      dueTodayCount: dueCount,
+      masteryPercentage: masteryPercentage,
     };
+
+    return { success: true, set: setWithCardsAndStats };
+
   } catch (error: any) {
     console.error("Error in getFlashcardSetDetailsAction:", error);
     return { success: false, error: error.message || "An unexpected error occurred" };

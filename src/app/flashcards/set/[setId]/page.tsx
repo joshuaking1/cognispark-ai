@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  ArrowLeftIcon, ArrowRightIcon, RefreshCwIcon, InfoIcon, Edit, Trash2, PlusCircle, Save, XCircle, Play, CheckCircle2, XOctagon, Brain, Zap, Loader2
+  ArrowLeftIcon, ArrowRightIcon, RefreshCwIcon, InfoIcon, Edit, Trash2, PlusCircle, Save, XCircle, Play, CheckCircle2, XOctagon, Brain, Zap, Loader2, FileQuestion, RotateCcw, XIcon, CheckIcon
 } from "lucide-react";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton"; // For loading state
@@ -29,6 +29,12 @@ import ChatMessageContentRenderer from "@/components/chat/ChatMessageContentRend
 import { generateStudyReportAction } from "@/app/actions/flashcardActions";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { DonutChart, List, ListItem, Card as TremorCard, Title, Text, ProgressBar, AreaChart } from "@tremor/react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 // Server action to fetch flashcard set details and its cards
 import {
@@ -77,9 +83,10 @@ interface FlashcardSet {
   user_id: string;
   created_at: string;
   updated_at: string;
-  masteryPercentage: number;
-  masteredCount: number;
-  totalCards: number;
+  totalCards?: number;
+  learnedCards?: number;
+  dueTodayCount?: number;
+  masteryPercentage?: number;
 }
 
 // Quality ratings for SRS
@@ -101,6 +108,10 @@ interface SessionHistoryDataForChart {
   date: string;
   "Overall Mastery (%)"?: number;
   "Good/Easy Cards (%)"?: number;
+}
+
+interface QuizModeCard extends Flashcard {
+  userGuessCorrect?: boolean | null;
 }
 
 export default function StudyFlashcardSetPage() {
@@ -137,60 +148,68 @@ export default function StudyFlashcardSetPage() {
   const [sessionHistoryForChart, setSessionHistoryForChart] = useState<SessionHistoryDataForChart[] | null>(null);
   const [isLoadingHistoryChart, setIsLoadingHistoryChart] = useState(false);
 
+  const [isQuizModeActive, setIsQuizModeActive] = useState(false);
+  const [quizModeCards, setQuizModeCards] = useState<QuizModeCard[]>([]);
+  const [currentQuizQuestionIndex, setCurrentQuizQuestionIndex] = useState(0);
+  const [isShowingQuizAnswer, setIsShowingQuizAnswer] = useState(false);
+  const [quizScore, setQuizScore] = useState({ correct: 0, total: 0 });
+  const [quizFinished, setQuizFinished] = useState(false);
+
   const fetchSetDetails = useCallback(async () => {
     console.log('Fetching set details', { setId });
     if (!setId) return;
-      setIsLoading(true);
-      setError(null);
-      try {
-        const result = await getFlashcardSetDetailsAction(setId);
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await getFlashcardSetDetailsAction(setId);
       console.log('Set details fetch result', { success: result.success });
-        if (result.success && result.data) {
-          const { id, title, description, user_id, created_at, updated_at, flashcards } = result.data;
-          const setData: FlashcardSet = {
-            id,
-            title,
-            description: description || null,
+      if (result.success && result.set) {
+        const { id, title, description, user_id, created_at, updated_at, flashcards, totalCards, learnedCards, dueTodayCount, masteryPercentage } = result.set;
+        const setData: FlashcardSet = {
+          id,
+          title,
+          description: description || null,
+          user_id,
+          created_at,
+          updated_at,
+          flashcards: flashcards.map(card => ({
+            id: card.id,
+            question: card.question,
+            answer: card.answer,
+            set_id: id,
             user_id,
             created_at,
             updated_at,
-            flashcards: flashcards.map(card => ({
-              id: card.id,
-              question: card.question,
-              answer: card.answer,
-              set_id: id,
-              user_id,
-              created_at,
-              updated_at,
-              due_date: card.due_date || null,
-              interval: card.interval || null,
-              ease_factor: card.ease_factor || null,
-              repetitions: card.repetitions || null,
-              last_reviewed_at: card.last_reviewed_at || null
+            due_date: card.due_date || null,
+            interval: card.interval || null,
+            ease_factor: card.ease_factor || null,
+            repetitions: card.repetitions || null,
+            last_reviewed_at: card.last_reviewed_at || null
           })),
-          masteryPercentage: result.data.masteryPercentage || 0,
-          masteredCount: result.data.masteredCount || 0,
-          totalCards: result.data.totalCards || flashcards.length
-          };
-          setFlashcardSetInfo(setData);
-          setAllCardsInSet(setData.flashcards);
+          totalCards,
+          learnedCards,
+          dueTodayCount,
+          masteryPercentage
+        };
+        setFlashcardSetInfo(setData);
+        setAllCardsInSet(setData.flashcards);
         if (!isStudyModeActive) {
-            setStudySessionCards(setData.flashcards);
-            setCurrentCardIndex(0);
-            setIsShowingAnswer(false);
-          }
-        } else {
-          setError(result.error || "Could not load flashcard set.");
-          toast.error("Load Failed", { description: result.error });
+          setStudySessionCards(setData.flashcards);
+          setCurrentCardIndex(0);
+          setIsShowingAnswer(false);
         }
-      } catch (err: any) {
-      console.error('Error in fetchSetDetails:', err);
-        setError("An unexpected error occurred.");
-        toast.error("Error", { description: err.message });
-      } finally {
-        setIsLoading(false);
+      } else {
+        setError(result.error || "Could not load flashcard set.");
+        toast.error("Load Failed", { description: result.error });
       }
-  }, [setId]);
+    } catch (err: any) {
+      console.error('Error in fetchSetDetails:', err);
+      setError("An unexpected error occurred.");
+      toast.error("Error", { description: err.message });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [setId, isStudyModeActive]);
 
   const fetchDueCards = useCallback(async () => {
     console.log('Fetching due cards', { setId, hasFlashcardSetInfo: !!flashcardSetInfo });
@@ -504,6 +523,52 @@ export default function StudyFlashcardSetPage() {
     }
   };
 
+  const startQuizMode = () => {
+    if (!allCardsInSet || allCardsInSet.length === 0) {
+      toast.info("No cards to quiz!", { description: "This set is empty." });
+      return;
+    }
+    const shuffled = [...allCardsInSet].sort(() => Math.random() - 0.5);
+    setQuizModeCards(shuffled.map(card => ({ ...card, userGuessCorrect: null })));
+    setCurrentQuizQuestionIndex(0);
+    setIsShowingQuizAnswer(false);
+    setQuizScore({ correct: 0, total: shuffled.length });
+    setQuizFinished(false);
+    setIsStudyModeActive(false);
+    setIsQuizModeActive(true);
+    toast.success("Quiz started!", { description: `Testing your knowledge on ${shuffled.length} cards.` });
+  };
+
+  const handleQuizAnswerGrading = (wasCorrect: boolean) => {
+    if (!currentQuizCard) return;
+
+    setQuizModeCards(prev => prev.map((card, index) =>
+      index === currentQuizQuestionIndex ? { ...card, userGuessCorrect: wasCorrect } : card
+    ));
+
+    if (wasCorrect) {
+      setQuizScore(prev => ({ ...prev, correct: prev.correct + 1 }));
+    }
+
+    if (currentQuizQuestionIndex < quizModeCards.length - 1) {
+      setCurrentQuizQuestionIndex(prev => prev + 1);
+      setIsShowingQuizAnswer(false);
+    } else {
+      setQuizFinished(true);
+      toast.info("Quiz Finished!", { description: `You scored ${quizScore.correct + (wasCorrect ? 1:0)}/${quizModeCards.length}. Review your answers below.`});
+    }
+  };
+
+  const currentQuizCard = quizModeCards[currentQuizQuestionIndex];
+
+  const exitQuizMode = () => {
+    setIsQuizModeActive(false);
+    setQuizModeCards([]);
+    setCurrentQuizQuestionIndex(0);
+    setIsShowingQuizAnswer(false);
+    setQuizFinished(false);
+  };
+
   if (isLoading) {
     return (
       <div className="container mx-auto py-8 px-4 md:px-0">
@@ -551,55 +616,153 @@ export default function StudyFlashcardSetPage() {
     return <div className="container mx-auto py-8 text-center">Loading card...</div>;
   }
 
+  // Quiz Mode Active UI
+  if (isQuizModeActive && !quizFinished) {
+    if (!currentQuizCard) return <div className="container py-8 text-center">Loading quiz question...</div>;
+    return (
+      <div className="container mx-auto py-8 px-4 md:px-0">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-semibold">Quiz Mode: {flashcardSetInfo?.title}</h1>
+          <Button variant="outline" onClick={exitQuizMode}><XCircle className="mr-2 h-4 w-4"/> Exit Quiz</Button>
+        </div>
+        <Card className="max-w-2xl mx-auto shadow-lg">
+          <CardHeader>
+            <CardTitle>Question {currentQuizQuestionIndex + 1} of {quizModeCards.length}</CardTitle>
+            <Progress value={((currentQuizQuestionIndex + 1) / quizModeCards.length) * 100} className="mt-2 h-2" />
+          </CardHeader>
+          <CardContent className="min-h-[200px] flex flex-col items-center justify-center p-6 text-center">
+            {!isShowingQuizAnswer ? (
+              <ChatMessageContentRenderer content={currentQuizCard.question} />
+            ) : (
+              <>
+                <Label className="text-sm font-medium text-muted-foreground mb-1">Answer:</Label>
+                <ChatMessageContentRenderer content={currentQuizCard.answer} />
+              </>
+            )}
+          </CardContent>
+          <CardFooter className="flex flex-col gap-3 pt-6">
+            {!isShowingQuizAnswer ? (
+              <Button onClick={() => setIsShowingQuizAnswer(true)} className="w-full sm:w-auto">Show Answer</Button>
+            ) : (
+              <div className="w-full space-y-3 text-center">
+                <p className="text-md font-medium">Did you get it right?</p>
+                <div className="flex justify-center gap-3">
+                  <Button onClick={() => handleQuizAnswerGrading(false)} variant="destructive" className="flex-1">
+                    <XIcon className="mr-2 h-4 w-4"/> Incorrect
+                  </Button>
+                  <Button onClick={() => handleQuizAnswerGrading(true)} variant="default" className="flex-1 bg-green-600 hover:bg-green-700">
+                    <CheckIcon className="mr-2 h-4 w-4"/> Correct
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
+  // Quiz Finished UI
+  if (isQuizModeActive && quizFinished) {
+    return (
+      <div className="container mx-auto py-8 px-4 md:px-0">
+        <Card className="max-w-2xl mx-auto shadow-lg">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl md:text-3xl">Quiz Complete: {flashcardSetInfo?.title}</CardTitle>
+            <div className="mt-4 text-3xl font-bold">
+              Final Score: <span className={quizScore.correct / quizScore.total >= 0.7 ? 'text-green-600' : quizScore.correct / quizScore.total >= 0.4 ? 'text-orange-500' : 'text-red-600'}>
+                {quizScore.correct} / {quizScore.total} ({quizScore.total > 0 ? Math.round((quizScore.correct / quizScore.total) * 100) : 0}%)
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent className="mt-6">
+            <h3 className="text-lg font-semibold mb-3">Review Your Answers:</h3>
+            <Accordion type="single" collapsible className="w-full">
+              {quizModeCards.map((q, index) => (
+                <AccordionItem value={`item-${index}`} key={q.id}>
+                  <AccordionTrigger className={`text-left text-md p-3 rounded-md ${
+                    q.userGuessCorrect === null ? '' : q.userGuessCorrect ? 'bg-green-50 dark:bg-green-900/30' : 'bg-red-50 dark:bg-red-900/30'
+                  }`}>
+                    <div className="flex items-center justify-between w-full">
+                      <span>Q{index + 1}: <ChatMessageContentRenderer content={q.question.length > 50 ? q.question.substring(0,50)+"..." : q.question}/></span>
+                      {q.userGuessCorrect === null ? null : q.userGuessCorrect ? <CheckIcon className="h-5 w-5 text-green-500"/> : <XIcon className="h-5 w-5 text-red-500"/>}
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="p-3 space-y-2 text-sm border-t">
+                    <div><strong>Your Guess:</strong> {q.userGuessCorrect === null ? "Not Graded" : (q.userGuessCorrect ? "Correct" : "Incorrect")}</div>
+                    <div><strong>Correct Answer:</strong> <ChatMessageContentRenderer content={q.answer}/></div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </CardContent>
+          <CardFooter className="flex flex-col sm:flex-row justify-center gap-3 pt-6">
+            <Button onClick={startQuizMode}><RotateCcw className="mr-2 h-4 w-4"/> Retake Quiz</Button>
+            <Button variant="outline" onClick={exitQuizMode}><ArrowLeftIcon className="mr-2 h-4 w-4"/> Back to Set Overview</Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
+  // Default: Render SRS Study / Browse Mode
   return (
-    <div className="container mx-auto py-4 md:py-8 px-4">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <Button 
-          variant="outline" 
-          onClick={() => router.push('/flashcards')}
-          className="w-full sm:w-auto bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:bg-white dark:hover:bg-slate-800 transition-all duration-200"
-        >
+    <div className="container mx-auto py-8 px-4 md:px-0">
+      <div className="flex justify-between items-center mb-6">
+        <Button variant="outline" onClick={() => router.push('/flashcards')}>
           <ArrowLeftIcon className="mr-2 h-4 w-4" /> Back to My Sets
         </Button>
-        <Button 
-          onClick={toggleStudyMode} 
-          variant={isStudyModeActive ? "secondary" : "default"}
-          className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02]"
-        >
-          {isStudyModeActive ? <XCircle className="mr-2 h-4 w-4"/> : <Play className="mr-2 h-4 w-4" />}
-          {isStudyModeActive ? "Exit Study Mode" : `Study Due Cards (${studySessionCards.filter(c => !c.due_date || new Date(c.due_date) <= new Date()).length})`}
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={toggleStudyMode} variant={isStudyModeActive ? "secondary" : "default"} disabled={!allCardsInSet || allCardsInSet.length === 0}>
+            {isStudyModeActive ? <XCircle className="mr-2 h-4 w-4"/> : <Play className="mr-2 h-4 w-4" />}
+            {isStudyModeActive ? "Exit Study Mode" : `Study Due Cards (${flashcardSetInfo?.dueTodayCount || 0})`}
+          </Button>
+          <Button onClick={startQuizMode} variant="outline" disabled={!allCardsInSet || allCardsInSet.length === 0 || isStudyModeActive}>
+            <FileQuestion className="mr-2 h-4 w-4" /> Quiz Me
+          </Button>
+        </div>
       </div>
 
-      <Card className="max-w-2xl mx-auto shadow-lg bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50">
+      <Card className="max-w-2xl mx-auto shadow-lg">
         <CardHeader className="pb-4">
-          <CardTitle className="text-xl md:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            {flashcardSetInfo?.title}
-          </CardTitle>
+          <CardTitle className="text-2xl md:text-3xl truncate">{flashcardSetInfo?.title}</CardTitle>
           {flashcardSetInfo?.description && (
-            <CardDescription className="text-sm md:text-base pt-1">
-              {flashcardSetInfo.description}
-            </CardDescription>
+            <CardDescription className="text-md pt-1">{flashcardSetInfo.description}</CardDescription>
           )}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pt-2">
-            <p className="text-sm text-muted-foreground">
-              {isStudyModeActive 
-                ? `Studying: Card ${currentCardIndex + 1} of ${studySessionCards.length}`
-                : `Browsing: Card ${currentCardIndex + 1} of ${allCardsInSet.length}`
-              }
-            </p>
-            <div className="flex items-center gap-2">
-              <div className="text-sm text-muted-foreground">
-                Mastery: {flashcardSetInfo?.masteryPercentage}%
+          
+          {/* Display Stats */}
+          {flashcardSetInfo && !isLoading && (
+            <div className="mt-3 pt-3 border-t text-sm text-muted-foreground space-y-1">
+              <div className="flex justify-between">
+                <span>Total Cards:</span>
+                <strong>{flashcardSetInfo.totalCards || 0}</strong>
               </div>
-              <Progress 
-                value={flashcardSetInfo?.masteryPercentage} 
-                className="w-24 h-2 bg-slate-100 dark:bg-slate-800" 
-              />
+              <div className="flex justify-between">
+                <span>Cards Learned:</span>
+                <strong className="text-green-600">{flashcardSetInfo.learnedCards || 0}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span>Due Today:</span>
+                <strong className="text-orange-500">{flashcardSetInfo.dueTodayCount || 0}</strong>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Set Mastery:</span>
+                <div className="flex items-center gap-2">
+                  <strong className="text-emerald-600">{flashcardSetInfo.masteryPercentage || 0}%</strong>
+                  <Progress value={flashcardSetInfo.masteryPercentage || 0} className="w-24 h-2" />
+                </div>
+              </div>
             </div>
-          </div>
+          )}
+
+          <p className="text-sm text-muted-foreground pt-3 mt-3 border-t">
+            {isStudyModeActive
+              ? `Studying: Card ${studySessionCards.length > 0 ? currentCardIndex + 1 : 0} of ${studySessionCards.length}`
+              : `Browsing: Card ${allCardsInSet.length > 0 ? currentCardIndex + 1 : 0} of ${allCardsInSet.length}`
+            }
+          </p>
           {isStudyModeActive && studySessionCards.length > 0 && (
-            <Progress value={sessionProgress} className="mt-2 h-2 bg-slate-100 dark:bg-slate-800" />
+            <Progress value={sessionProgress} className="mt-2 h-2" />
           )}
         </CardHeader>
 
