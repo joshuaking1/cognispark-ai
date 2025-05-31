@@ -24,6 +24,62 @@ import { useChat, type Message as VercelAIMessage } from "ai/react";
 import { format, isToday, isYesterday } from "date-fns";
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 
+// Add Web Speech API type declarations
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionError {
+  error: string;
+  message: string;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  isFinal: boolean;
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  onaudioend: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onaudiostart: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onend: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onerror: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onnomatch: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null;
+  onsoundend: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onsoundstart: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onspeechend: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onspeechstart: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onstart: ((this: SpeechRecognition, ev: Event) => any) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: new () => SpeechRecognition;
+    webkitSpeechRecognition: new () => SpeechRecognition;
+  }
+}
 
 // Helper function to get search params
 const getSearchParams = () => {
@@ -161,7 +217,13 @@ export default function ChatInterface() {
     setIsHistoryLoading(true);
     try {
       const messages = await getMessagesForConversation(conversationId);
-      setVercelMessages(messages);
+      const formattedMessages = messages.map(msg => ({
+        id: msg.id!,
+        role: msg.sender as "user" | "assistant",
+        content: msg.content,
+        createdAt: new Date(msg.created_at!)
+      }));
+      setVercelMessages(formattedMessages);
       setCurrentConversationId(conversationId);
       setInput(''); // Clear input when switching conversations
     } catch (err) {
@@ -170,7 +232,7 @@ export default function ChatInterface() {
     } finally {
       setIsHistoryLoading(false);
     }
-  }, [setVercelMessages]);
+  }, [setVercelMessages, setInput]);
 
   const scrollToBottom = useCallback((behavior: 'auto' | 'smooth' = 'auto') => {
     const scrollArea = scrollAreaRef.current;
@@ -211,7 +273,7 @@ export default function ChatInterface() {
         id: msg.id!,
         role: msg.sender as "user" | "assistant",
         content: msg.content,
-        createdAt: new Date(msg.created_at!),
+        createdAt: new Date(msg.created_at!)
       }));
       setVercelMessages(formattedVercelMessages);
       setCurrentConversationId(convoId);
@@ -224,7 +286,7 @@ export default function ChatInterface() {
     } finally {
       setIsHistoryLoading(false);
     }
-  }, [setVercelMessages, setInput, currentConversationId, messages.length, loadConversationsList]);
+  }, [setVercelMessages, setInput, currentConversationId, loadConversationsList]);
 
   // Initial load of conversations
   useEffect(() => {
@@ -278,20 +340,23 @@ export default function ChatInterface() {
       const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognitionAPI) {
         recognition = new SpeechRecognitionAPI();
-        recognition.continuous = false;
-        recognition.interimResults = false;
-        recognition.lang = 'en-US';
+        if (recognition) {
+          recognition.continuous = false;
+          recognition.interimResults = false;
+          recognition.lang = 'en-US';
 
-        recognition.onresult = (event) => {
-          const transcript = event.results[event.results.length - 1][0].transcript.trim();
-          setInput(prevInput => prevInput ? `${prevInput} ${transcript}` : transcript);
-          setIsListening(false);
-        };
-        recognition.onerror = (event) => {
-          toast.error("Voice Error", { description: `Could not recognize speech: ${event.error}` });
-          setIsListening(false);
-        };
-        recognition.onend = () => setIsListening(false);
+          recognition.onresult = (event: SpeechRecognitionEvent) => {
+            const transcript = event.results[event.results.length - 1][0].transcript.trim();
+            setInput(prevInput => prevInput ? `${prevInput} ${transcript}` : transcript);
+            setIsListening(false);
+          };
+          recognition.onerror = (event: Event) => {
+            const errorEvent = event as unknown as SpeechRecognitionError;
+            toast.error("Voice Error", { description: `Could not recognize speech: ${errorEvent.error}` });
+            setIsListening(false);
+          };
+          recognition.onend = () => setIsListening(false);
+        }
       } else {
         console.warn('Speech Recognition API not supported.');
       }
@@ -448,13 +513,12 @@ export default function ChatInterface() {
   };
 
   const customSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-      handleSubmit(e, {
-          options: {
-              body: {
-                  conversationId: currentConversationId
-              }
-          }
-      });
+    e.preventDefault();
+    handleSubmit(e, {
+      body: {
+        conversationId: currentConversationId
+      }
+    });
   };
 
   return (
@@ -721,7 +785,12 @@ export default function ChatInterface() {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
                       if (!chatIsLoading && input.trim()) {
-                        customSubmit(e.currentTarget.form as HTMLFormElement);
+                        const form = e.currentTarget.form;
+                        if (form) {
+                          const formEvent = new Event('submit') as unknown as React.FormEvent<HTMLFormElement>;
+                          formEvent.preventDefault = () => {};
+                          customSubmit(formEvent);
+                        }
                       }
                     }
                   }}

@@ -207,25 +207,25 @@ export default function TakeQuizPage() {
                   {currentQuestion?.options?.map((option, index) => (
                     <Button
                       key={index}
-                      variant={userAnswers[currentQuestionIndex] === option ? "default" : "outline"}
+                      variant={userAnswers[currentQuestionIndex]?.selectedAnswer === option ? "default" : "outline"}
                       className={`w-full justify-start text-left h-auto py-3 px-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-200 ${
-                        userAnswers[currentQuestionIndex] === option 
-                          ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white border-transparent" 
+                        userAnswers[currentQuestionIndex]?.selectedAnswer === option
+                          ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white border-transparent"
                           : ""
                       }`}
                       onClick={() => handleAnswerSelection(option)}
                     >
-                      <span className="mr-3 text-sm font-medium">{String.fromCharCode(65 + index)}.</span>
-                      <span className="text-sm">{option}</span>
+                      <span className="font-medium mr-2">{String.fromCharCode(65 + index)}.</span>
+                      {option}
                     </Button>
                   ))}
                 </div>
               ) : (
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Button
-                    variant={userAnswers[currentQuestionIndex] === "True" ? "default" : "outline"}
+                    variant={userAnswers[currentQuestionIndex]?.selectedAnswer === "True" ? "default" : "outline"}
                     className={`flex-1 h-auto py-3 px-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-200 ${
-                      userAnswers[currentQuestionIndex] === "True" 
+                      userAnswers[currentQuestionIndex]?.selectedAnswer === "True" 
                         ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white border-transparent" 
                         : ""
                     }`}
@@ -234,9 +234,9 @@ export default function TakeQuizPage() {
                     True
                   </Button>
                   <Button
-                    variant={userAnswers[currentQuestionIndex] === "False" ? "default" : "outline"}
+                    variant={userAnswers[currentQuestionIndex]?.selectedAnswer === "False" ? "default" : "outline"}
                     className={`flex-1 h-auto py-3 px-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all duration-200 ${
-                      userAnswers[currentQuestionIndex] === "False" 
+                      userAnswers[currentQuestionIndex]?.selectedAnswer === "False" 
                         ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white border-transparent" 
                         : ""
                     }`}
