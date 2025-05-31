@@ -7,6 +7,9 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Copy } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
 
 interface MarkdownContentProps {
   content: string;
@@ -32,11 +35,17 @@ const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, className })
           blockquote: ({ node, ...props }) => (
             <blockquote className="border-l-4 border-muted-foreground/20 pl-4 italic my-4" {...props} />
           ),
-          code: ({ node, inline, className, children, ...props }) => {
+          code: ({ node, inline, className, children, ...props }: {
+            node?: any;
+            inline?: boolean;
+            className?: string;
+            children: React.ReactNode;
+            [key: string]: any;
+          }) => {
             if (inline) {
               return (
                 <code
-                  className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono"
+                  className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm"
                   {...props}
                 >
                   {children}
@@ -44,11 +53,26 @@ const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, className })
               );
             }
             return (
-              <pre className="bg-muted p-4 rounded-lg overflow-x-auto my-4">
-                <code className={cn("text-xs font-mono", className)} {...props}>
-                  {children}
-                </code>
-              </pre>
+              <div className="relative my-4">
+                <div className="absolute right-2 top-2 flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => {
+                      navigator.clipboard.writeText(String(children));
+                      toast.success("Copied to clipboard");
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+                <pre className="overflow-x-auto rounded-lg border bg-muted p-4">
+                  <code className="font-mono text-sm" {...props}>
+                    {children}
+                  </code>
+                </pre>
+              </div>
             );
           },
           table: ({ node, ...props }) => (
