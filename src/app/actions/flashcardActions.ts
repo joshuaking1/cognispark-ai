@@ -164,7 +164,7 @@ export async function getFlashcardSetDetailsAction(setId: string): Promise<GetSe
     // Fetch all flashcards for this set with their SRS data
     const { data: allCardsData, error: cardsError } = await supabase
       .from("flashcards")
-      .select("id, question, answer, due_date, interval, repetitions")
+      .select("id, question, answer, due_date, interval, repetitions, ease_factor, last_reviewed_at")
       .eq("set_id", setId)
       .eq("user_id", user.id)
       .order("created_at", { ascending: true });
@@ -177,7 +177,9 @@ export async function getFlashcardSetDetailsAction(setId: string): Promise<GetSe
       answer: c.answer,
       due_date: c.due_date,
       interval: c.interval,
-      repetitions: c.repetitions
+      repetitions: c.repetitions,
+      ease_factor: c.ease_factor,
+      last_reviewed_at: c.last_reviewed_at
     }));
 
     // Calculate Stats
