@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -38,7 +38,7 @@ const srsQualityRatings = [
   { label: "Easy", value: 3, color: "bg-blue-500 hover:bg-blue-600", icon: <Zap className="mr-2 h-4 w-4"/> },
 ];
 
-export default function StudySessionPage() {
+function StudySessionContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const setIds = searchParams.get('sets')?.split(',') || [];
@@ -328,5 +328,21 @@ export default function StudySessionPage() {
         </AlertDialog>
       )}
     </div>
+  );
+}
+
+export default function StudySessionPage() {
+  return (
+    <Suspense fallback={
+      <div className="container mx-auto py-8 px-4 md:px-0">
+        <Card className="max-w-2xl mx-auto">
+          <CardContent className="min-h-[300px] flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <StudySessionContent />
+    </Suspense>
   );
 } 
