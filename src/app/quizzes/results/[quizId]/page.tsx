@@ -25,6 +25,14 @@ interface ResultQuestion extends QuizQuestionWithAnswer {
   isCorrect?: boolean;
 }
 
+type QuestionType = 'multiple_choice' | 'true_false' | 'short_answer';
+
+interface Question {
+  question_type: QuestionType;
+  isCorrect: boolean;
+  // ... other properties
+}
+
 export default function QuizResultsPage() {
   const params = useParams();
   const router = useRouter();
@@ -189,8 +197,9 @@ export default function QuizResultsPage() {
     };
 
     resultQuestions.forEach(q => {
-      stats[q.question_type].total++;
-      if (q.isCorrect) stats[q.question_type].correct++;
+      const type = q.question_type as QuestionType;
+      stats[type].total++;
+      if (q.isCorrect) stats[type].correct++;
     });
 
     return stats;

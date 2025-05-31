@@ -92,12 +92,11 @@ export default function CreateQuizPage() {
                     Quiz Type
                   </Label>
                   <Select
-                    id="quizType"
                     value={selectedQuizType}
                     onValueChange={(value) => setSelectedQuizType(value as "multiple_choice" | "true_false")}
                     disabled={isLoading}
                   >
-                    <SelectTrigger className="w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50">
+                    <SelectTrigger id="quizType" className="w-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50">
                       <SelectValue placeholder="Select quiz type" />
                     </SelectTrigger>
                     <SelectContent>

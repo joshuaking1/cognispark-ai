@@ -458,11 +458,11 @@ export default function DashboardPage() {
         onOpenChange={setShowOnboarding}
         onComplete={async (data) => {
           const result = await updateUserProfile({
-            fullName: data.fullName,
-            dateOfBirth: data.dateOfBirth,
-            gradeLevel: data.gradeLevel,
-            subjectsOfInterest: data.subjectsOfInterest,
-            hasCompletedOnboarding: true
+            fullName: data.full_name,
+            date_of_birth: data.date_of_birth,
+            grade_level: data.grade_level,
+            subjects_of_interest: data.subjects_of_interest,
+            has_completed_onboarding: true
           });
           
           if (result.success) {

@@ -29,10 +29,11 @@ interface ActionResult<T = any> {
   cardsGeneratedCount?: number;
 }
 
-interface FlashcardForClient { // For sending to client
+export interface FlashcardForClient { // For sending to client
   id: string;
   question: string;
   answer: string;
+  set_id: string;
   due_date: string | null;
   interval: number | null;
   ease_factor: number | null;
@@ -175,6 +176,7 @@ export async function getFlashcardSetDetailsAction(setId: string): Promise<GetSe
       id: c.id,
       question: c.question,
       answer: c.answer,
+      set_id: setId,
       due_date: c.due_date,
       interval: c.interval,
       repetitions: c.repetitions,
@@ -493,7 +495,7 @@ export async function updateFlashcardAction(
       })
       .eq("id", flashcardId)
       .eq("user_id", user.id)
-      .select("id, question, answer, due_date, interval, ease_factor, repetitions, last_reviewed_at")
+      .select("id, question, answer, set_id, due_date, interval, ease_factor, repetitions, last_reviewed_at")
       .single();
 
     if (updateError) throw updateError;
@@ -607,7 +609,7 @@ export async function addManualFlashcardAction(
         repetitions: null,
         last_reviewed_at: null
       })
-      .select("id, question, answer, due_date, interval, ease_factor, repetitions, last_reviewed_at")
+      .select("id, question, answer, set_id, due_date, interval, ease_factor, repetitions, last_reviewed_at")
       .single();
 
     if (insertError) throw insertError;
@@ -724,7 +726,7 @@ export async function getDueFlashcardsForSetAction(setId: string): Promise<DueCa
     const now = new Date().toISOString();
     const { data: dueCards, error } = await supabase
       .from("flashcards")
-      .select("id, question, answer, due_date, interval, ease_factor, repetitions, last_reviewed_at")
+      .select("id, question, answer, set_id, due_date, interval, ease_factor, repetitions, last_reviewed_at")
       .eq("set_id", setId)
       .eq("user_id", user.id)
       .lte("due_date", now)
@@ -828,12 +830,12 @@ export async function getDueFlashcardsForMultipleSetsAction(setIds: string[]): P
       id,
       question,
       answer,
+      set_id,
       due_date,
       interval,
       ease_factor,
       repetitions,
       last_reviewed_at,
-      set_id,
       flashcard_sets!inner (
         title
       )

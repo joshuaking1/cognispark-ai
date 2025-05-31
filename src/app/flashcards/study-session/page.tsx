@@ -21,20 +21,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import ChatMessageContentRenderer from "@/components/chat/ChatMessageContentRenderer";
-import { generateStudyReportAction, getDueFlashcardsForMultipleSetsAction, updateFlashcardSRSDataAction } from "@/app/actions/flashcardActions";
+import { generateStudyReportAction, getDueFlashcardsForMultipleSetsAction, updateFlashcardSRSDataAction, FlashcardForClient } from "@/app/actions/flashcardActions";
 import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
-
-interface Flashcard {
-  id: string;
-  question: string;
-  answer: string;
-  set_id: string;
-  due_date: string | null;
-  interval: number | null;
-  ease_factor: number | null;
-  repetitions: number | null;
-  last_reviewed_at: string | null;
-}
 
 interface StudyPerformanceData {
   cardId: string;
@@ -55,7 +43,7 @@ export default function StudySessionPage() {
   const router = useRouter();
   const setIds = searchParams.get('sets')?.split(',') || [];
   
-  const [studySessionCards, setStudySessionCards] = useState<Flashcard[]>([]);
+  const [studySessionCards, setStudySessionCards] = useState<FlashcardForClient[]>([]);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [isShowingAnswer, setIsShowingAnswer] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
