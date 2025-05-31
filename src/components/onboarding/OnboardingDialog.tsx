@@ -36,10 +36,10 @@ interface OnboardingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onComplete: (data: {
-    fullName: string;
-    dateOfBirth: string;
-    gradeLevel: string;
-    subjectsOfInterest: string[];
+    full_name: string;
+    date_of_birth: string;
+    grade_level: string;
+    subjects_of_interest: string[];
   }) => Promise<void>;
 }
 
@@ -117,10 +117,10 @@ export default function OnboardingDialog({ open, onOpenChange, onComplete }: Onb
 
       toast.success("Profile updated successfully!");
       onComplete({
-        fullName: formData.full_name,
-        dateOfBirth: formData.date_of_birth,
-        gradeLevel: formData.grade_level,
-        subjectsOfInterest: subjectsArray,
+        full_name: formData.full_name,
+        date_of_birth: formData.date_of_birth,
+        grade_level: formData.grade_level,
+        subjects_of_interest: subjectsArray,
       });
     } catch (error: any) {
       toast.error("Failed to update profile", {
