@@ -33,8 +33,14 @@ import {
 } from "lucide-react";
 
 interface OnboardingDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onComplete: (data: {
+    fullName: string;
+    dateOfBirth: string;
+    gradeLevel: string;
+    subjectsOfInterest: string[];
+  }) => Promise<void>;
 }
 
 type OnboardingStep = "welcome" | "personal" | "education" | "interests";
@@ -45,7 +51,7 @@ const gradeLevels = [
   "11th Grade (SHS2)", "12th Grade (SHS3)", "College/University", "Adult Learner", "Other"
 ];
 
-export default function OnboardingDialog({ isOpen, onClose }: OnboardingDialogProps) {
+export default function OnboardingDialog({ open, onOpenChange, onComplete }: OnboardingDialogProps) {
   const [currentStep, setCurrentStep] = useState<OnboardingStep>("welcome");
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -110,7 +116,12 @@ export default function OnboardingDialog({ isOpen, onClose }: OnboardingDialogPr
       if (error) throw error;
 
       toast.success("Profile updated successfully!");
-      onClose();
+      onComplete({
+        fullName: formData.full_name,
+        dateOfBirth: formData.date_of_birth,
+        gradeLevel: formData.grade_level,
+        subjectsOfInterest: subjectsArray,
+      });
     } catch (error: any) {
       toast.error("Failed to update profile", {
         description: error.message,
@@ -250,7 +261,7 @@ export default function OnboardingDialog({ isOpen, onClose }: OnboardingDialogPr
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <AnimatePresence mode="wait">
