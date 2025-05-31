@@ -10,81 +10,78 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Copy } from 'lucide-react';
 import { toast } from 'sonner';
+import type { Components } from 'react-markdown';
 
 interface MarkdownContentProps {
   content: string;
   className?: string;
 }
 
+interface CodeProps {
+  inline?: boolean;
+  className?: string;
+  children?: React.ReactNode;
+}
+
 const MarkdownContent: React.FC<MarkdownContentProps> = ({ content, className }) => {
+  const components: Components = {
+    h1: ({ node, ...props }) => <h1 className="text-2xl font-bold my-4" {...props} />,
+    h2: ({ node, ...props }) => <h2 className="text-xl font-bold my-3" {...props} />,
+    h3: ({ node, ...props }) => <h3 className="text-lg font-semibold my-2" {...props} />,
+    p: ({ node, ...props }) => <p className="mb-4" {...props} />,
+    ul: ({ node, ...props }) => <ul className="list-disc ml-6 mb-4" {...props} />,
+    ol: ({ node, ...props }) => <ol className="list-decimal ml-6 mb-4" {...props} />,
+    li: ({ node, ...props }) => <li className="mb-1" {...props} />,
+    a: ({ node, ...props }) => <a className="text-primary underline" {...props} />,
+    blockquote: ({ node, ...props }) => (
+      <blockquote className="border-l-4 border-muted-foreground/20 pl-4 italic my-4" {...props} />
+    ),
+    code: ({ inline, className, children, ...props }: CodeProps) => {
+      const match = /language-(\w+)/.exec(className || '');
+      return !inline ? (
+        <div className="relative my-4">
+          <div className="absolute right-2 top-2 flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => {
+                navigator.clipboard.writeText(String(children));
+                toast.success("Copied to clipboard");
+              }}
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
+          </div>
+          <pre className="overflow-x-auto rounded-lg border bg-muted p-4">
+            <code className={cn("font-mono text-sm", match ? `language-${match[1]}` : '')} {...props}>
+              {children}
+            </code>
+          </pre>
+        </div>
+      ) : (
+        <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm" {...props}>
+          {children}
+        </code>
+      );
+    },
+    table: ({ node, ...props }) => (
+      <div className="overflow-x-auto my-4">
+        <table className="min-w-full divide-y divide-border" {...props} />
+      </div>
+    ),
+    th: ({ node, ...props }) => (
+      <th className="px-3 py-2 text-left font-semibold bg-muted" {...props} />
+    ),
+    td: ({ node, ...props }) => <td className="px-3 py-2 border-t border-border" {...props} />,
+  };
+
   return (
     <div className={cn('markdown-content text-sm leading-relaxed', className)}>
       <ReactMarkdown
         remarkPlugins={[remarkMath, remarkGfm]}
         rehypePlugins={[[rehypeKatex, { throwOnError: false, strict: false }]]}
-        components={{
-          // Style the various HTML elements from markdown
-          h1: ({ node, ...props }) => <h1 className="text-2xl font-bold my-4" {...props} />,
-          h2: ({ node, ...props }) => <h2 className="text-xl font-bold my-3" {...props} />,
-          h3: ({ node, ...props }) => <h3 className="text-lg font-semibold my-2" {...props} />,
-          p: ({ node, ...props }) => <p className="mb-4" {...props} />,
-          ul: ({ node, ...props }) => <ul className="list-disc ml-6 mb-4" {...props} />,
-          ol: ({ node, ...props }) => <ol className="list-decimal ml-6 mb-4" {...props} />,
-          li: ({ node, ...props }) => <li className="mb-1" {...props} />,
-          a: ({ node, ...props }) => <a className="text-primary underline" {...props} />,
-          blockquote: ({ node, ...props }) => (
-            <blockquote className="border-l-4 border-muted-foreground/20 pl-4 italic my-4" {...props} />
-          ),
-          code: ({ node, inline, className, children, ...props }: {
-            node?: any;
-            inline?: boolean;
-            className?: string;
-            children: React.ReactNode;
-            [key: string]: any;
-          }) => {
-            if (inline) {
-              return (
-                <code
-                  className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm"
-                  {...props}
-                >
-                  {children}
-                </code>
-              );
-            }
-            return (
-              <div className="relative my-4">
-                <div className="absolute right-2 top-2 flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => {
-                      navigator.clipboard.writeText(String(children));
-                      toast.success("Copied to clipboard");
-                    }}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-                <pre className="overflow-x-auto rounded-lg border bg-muted p-4">
-                  <code className="font-mono text-sm" {...props}>
-                    {children}
-                  </code>
-                </pre>
-              </div>
-            );
-          },
-          table: ({ node, ...props }) => (
-            <div className="overflow-x-auto my-4">
-              <table className="min-w-full divide-y divide-border" {...props} />
-            </div>
-          ),
-          th: ({ node, ...props }) => (
-            <th className="px-3 py-2 text-left font-semibold bg-muted" {...props} />
-          ),
-          td: ({ node, ...props }) => <td className="px-3 py-2 border-t border-border" {...props} />,
-        }}
+        components={components}
       >
         {content}
       </ReactMarkdown>

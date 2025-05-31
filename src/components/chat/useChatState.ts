@@ -1,6 +1,6 @@
 import { useState, Dispatch, SetStateAction } from 'react';
-import { Conversation } from '@/types';
-import { VercelAIMessage } from '@vercel/ai';
+import { Conversation } from '@/types/chat';
+import { Message as VercelAIMessage } from 'ai';
 
 interface ChatState {
   isSidebarLoading: boolean;
