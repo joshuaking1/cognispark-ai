@@ -19,8 +19,6 @@ if (!groqApiKey) {
 }
 const groq = new Groq({ apiKey: groqApiKey });
 
-export const runtime = "edge";
-
 const MAX_HISTORY_MESSAGES_API = 10;
 
 interface ChatMessageForDB {
