@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, useRef, ChangeEvent, DragEvent } from "react";
+import { useState, useRef, ChangeEvent, DragEvent, useEffect } from "react";
+import { createPagesBrowserClient } from "@supabase/auth-helpers-nextjs";
+import Joyride, { Step } from "react-joyride";
+import { useFeatureTour } from "@/hooks/useFeatureTour";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,6 +32,82 @@ export default function PhotoSolverPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [progress, setProgress] = useState(0);
   const [loadingStage, setLoadingStage] = useState<'uploading' | 'processing' | null>(null);
+  const [result, setResult] = useState<{ success: boolean; text?: string; error?: string } | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  
+  const supabase = createPagesBrowserClient();
+  
+  // Define tour steps
+  const tourSteps: Step[] = [
+    {
+      target: ".photo-solver-page",
+      content: "Welcome to Nova's Photo Solver! This tool helps you solve math problems, science questions, and more from images.",
+      disableBeacon: true,
+      placement: "center"
+    },
+    {
+      target: ".upload-area",
+      content: "Upload or drag & drop a photo of your homework, math problem, or any question you need help with.",
+      placement: "bottom"
+    },
+    {
+      target: ".file-input-button",
+      content: "Click here to select an image from your device.",
+      placement: "bottom"
+    },
+    {
+      target: ".process-button",
+      content: "After uploading your image, click here to have Nova analyze it and provide a solution.",
+      placement: "bottom"
+    },
+    {
+      target: ".solution-area",
+      content: "Your solution will appear here. Nova will explain the steps and provide a detailed answer.",
+      placement: "top"
+    }
+  ];
+  
+  // Use our custom feature tour hook
+  const { runTour, handleJoyrideCallback, startTour } = useFeatureTour({
+    tourKey: "photo_solver",
+    steps: tourSteps,
+    isTourEnabledInitially: false // Will be set based on user profile
+  });
+  
+  // Fetch user profile to check if tour has been completed
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session) {
+          const { data: profile, error } = await supabase
+            .from('user_profiles')
+            .select('completed_tours')
+            .eq('id', session.user.id)
+            .single();
+            
+          if (!error && profile) {
+            setUserProfile(profile);
+            
+            // Check if user has completed this tour
+            const completedTours = profile.completed_tours || [];
+            if (!completedTours.includes('photo_solver')) {
+              // If not completed, run the tour
+              startTour();
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      } finally {
+        setIsLoadingProfile(false);
+      }
+    };
+    
+    fetchUserProfile();
+  }, [supabase, startTour]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -86,7 +165,7 @@ export default function PhotoSolverPage() {
     }
   };
 
-  const handleSubmitImage = async () => {
+  const handleProcessImage = async () => {
     if (!selectedFile) {
       toast.error("No image selected.");
       return;
@@ -110,15 +189,16 @@ export default function PhotoSolverPage() {
         });
       }, 200);
 
-      const result = await processImageWithOCRAction(formData);
+      const processResult = await processImageWithOCRAction(formData);
       clearInterval(uploadInterval);
       setProgress(100);
       setLoadingStage('processing');
+      setResult(processResult);
 
-      if (result.success && result.text) {
+      if (processResult.success && processResult.text) {
         toast.success("Text extracted! Asking Nova for help...");
 
-        const problemTextFromOCR = result.text;
+        const problemTextFromOCR = processResult.text;
         const instructionForNova = `The following text was extracted from an image of a student's homework problem. Please analyze it carefully.
 If it appears to be a question or problem requiring a solution (e.g., math, science, logic puzzle, concept explanation):
 1.  Restate the core problem or question clearly.
@@ -140,7 +220,7 @@ Your step-by-step explanation or clarifying questions:`;
         router.push(`/chat?prefill=${encodedInstruction}`);
 
       } else {
-        toast.error("OCR Failed", { description: result.error || "Could not extract text from the image." });
+        toast.error("OCR Failed", { description: processResult.error || "Could not extract text from the image." });
       }
     } catch (error: any) {
       toast.error("Upload Error", { description: error.message || "An unexpected error occurred." });
@@ -152,72 +232,121 @@ Your step-by-step explanation or clarifying questions:`;
   };
 
   return (
-    <div className="container mx-auto py-4 md:py-8 px-4">
-      <Card className="max-w-2xl mx-auto bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50">
-        <CardHeader className="space-y-2">
-          <CardTitle className="text-xl md:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+    <div className="container max-w-5xl mx-auto py-8 px-4 sm:px-6 photo-solver-page min-h-screen bg-gradient-to-br from-slate-50 via-white to-orange-50/30 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+      {/* Joyride Tour */}
+      <Joyride
+        steps={tourSteps}
+        run={runTour}
+        continuous
+        showSkipButton
+        showProgress
+        callback={handleJoyrideCallback}
+        styles={{
+          options: {
+            primaryColor: '#fd6a3e',
+            zIndex: 1000,
+          },
+        }}
+      />
+      
+      {/* Header Section */}
+      <div className="text-center mb-8">
+        <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-[#fd6a3e] to-[#ff8c69] shadow-lg mb-6">
+          <ImageIcon className="h-10 w-10 text-white" />
+        </div>
+        <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
+          <span className="bg-gradient-to-r from-[#022e7d] via-[#fd6a3e] to-[#022e7d] bg-clip-text text-transparent">
             Nova's Photo Problem Solver
+          </span>
+        </h1>
+        <p className="text-lg md:text-xl text-slate-600 dark:text-slate-300 max-w-2xl mx-auto leading-relaxed">
+          Transform your homework photos into step-by-step solutions with AI-powered analysis
+        </p>
+      </div>
+
+      <Card className="max-w-3xl mx-auto bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border-0 shadow-2xl shadow-[#fd6a3e]/10 dark:shadow-[#fd6a3e]/5">
+        <CardHeader className="space-y-2 bg-gradient-to-r from-[#022e7d]/5 to-[#fd6a3e]/5 rounded-t-lg border-b border-slate-200/50 dark:border-slate-700/50">
+          <CardTitle className="text-xl md:text-2xl font-bold text-[#022e7d] dark:text-slate-100">
+            Upload Your Problem
           </CardTitle>
-          <CardDescription className="text-sm md:text-base text-slate-600 dark:text-slate-400">
+          <CardDescription className="text-base text-slate-600 dark:text-slate-400">
             Upload an image of a math problem, science question, or any text you need help with.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        
+        <CardContent className="space-y-6 p-6 md:p-8">
           <div className="space-y-4">
             <div
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               className={cn(
-                "flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 rounded-xl bg-slate-50/50 dark:bg-slate-800/50 border-2 border-dashed transition-all duration-200",
+                "flex flex-col items-center gap-6 p-8 rounded-2xl border-2 border-dashed transition-all duration-300 upload-area",
                 isDragging
-                  ? "border-blue-500 bg-blue-50/50 dark:bg-blue-900/20"
-                  : "border-slate-200/50 dark:border-slate-700/50 hover:border-blue-400/50 dark:hover:border-blue-400/50"
+                  ? "border-[#fd6a3e] bg-gradient-to-br from-[#fd6a3e]/10 via-orange-50/50 to-[#fd6a3e]/5 scale-[1.02] shadow-lg shadow-[#fd6a3e]/20"
+                  : "border-slate-300/60 dark:border-slate-600/60 hover:border-[#fd6a3e]/60 bg-gradient-to-br from-slate-50/50 to-white/80 dark:from-slate-800/50 dark:to-slate-700/30 hover:shadow-lg hover:shadow-[#fd6a3e]/10"
               )}
             >
-              <div className="flex-1 w-full">
-                <Label
-                  htmlFor="imageUpload"
-                  className="text-sm md:text-base font-medium text-slate-700 dark:text-slate-300 flex items-center gap-2 cursor-pointer group"
-                >
-                  <UploadCloud className="h-5 w-5 text-blue-600 dark:text-blue-400 transition-transform duration-200 group-hover:scale-110" />
-                  <span>Upload Image or Drag & Drop</span>
-                </Label>
-                <Input
-                  id="imageUpload"
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleFileChange}
-                  accept="image/png, image/jpeg, image/webp, image/gif"
-                  className="mt-2 block w-full text-sm text-slate-500 dark:text-slate-400
-                           file:mr-4 file:py-2 file:px-4
-                           file:rounded-full file:border-0
-                           file:text-sm file:font-semibold
-                           file:bg-blue-50 dark:file:bg-blue-900/20
-                           file:text-blue-600 dark:file:text-blue-400
-                           hover:file:bg-blue-100 dark:hover:file:bg-blue-900/30
-                           disabled:opacity-50 disabled:cursor-not-allowed
-                           bg-white/50 dark:bg-slate-800/50
-                           border-slate-200/50 dark:border-slate-700/50
-                           transition-all duration-200"
-                  disabled={isLoading}
-                />
-                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-                  Max file size: 5MB. Supported types: JPG, PNG, WEBP, GIF.
-                </p>
+              <div className="text-center space-y-4">
+                <div className={cn(
+                  "mx-auto w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300",
+                  isDragging 
+                    ? "bg-gradient-to-br from-[#fd6a3e] to-[#ff8c69] scale-110 shadow-lg shadow-[#fd6a3e]/30" 
+                    : "bg-gradient-to-br from-[#fd6a3e]/20 to-[#ff8c69]/20 hover:from-[#fd6a3e]/30 hover:to-[#ff8c69]/30"
+                )}>
+                  <UploadCloud className={cn(
+                    "h-8 w-8 transition-all duration-300",
+                    isDragging ? "text-white" : "text-[#fd6a3e]"
+                  )} />
+                </div>
+                
+                <div>
+                  <Label
+                    htmlFor="imageUpload"
+                    className="text-lg font-semibold text-[#022e7d] dark:text-slate-200 cursor-pointer hover:text-[#fd6a3e] transition-colors duration-200"
+                  >
+                    Drop your image here or click to browse
+                  </Label>
+                  <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                    Max file size: 5MB • Supported: JPG, PNG, WEBP, GIF
+                  </p>
+                </div>
               </div>
+              
+              <Input
+                id="imageUpload"
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                accept="image/png, image/jpeg, image/webp, image/gif"
+                className="hidden file-input-button"
+                disabled={isLoading}
+              />
+              
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                variant="outline"
+                className="px-8 py-3 rounded-full border-2 border-[#fd6a3e]/30 text-[#fd6a3e] hover:bg-[#fd6a3e] hover:text-white hover:border-[#fd6a3e] transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-[#fd6a3e]/25"
+                disabled={isLoading}
+              >
+                <UploadCloud className="mr-2 h-5 w-5" />
+                Choose File
+              </Button>
             </div>
 
             {previewUrl && (
-              <div className="space-y-4 p-4 rounded-xl bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50 animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <div className="space-y-4 p-6 rounded-2xl bg-gradient-to-br from-slate-50/80 to-white/60 dark:from-slate-800/50 dark:to-slate-700/30 border border-slate-200/50 dark:border-slate-600/50 animate-in fade-in slide-in-from-bottom-4 duration-500 shadow-lg">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm md:text-base font-medium text-slate-700 dark:text-slate-300">Image Preview</h3>
+                  <h3 className="text-lg font-semibold text-[#022e7d] dark:text-slate-200 flex items-center gap-2">
+                    <ImageIcon className="h-5 w-5 text-[#fd6a3e]" />
+                    Image Preview
+                  </h3>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleRemoveImage}
                     disabled={isLoading}
-                    className="h-8 text-xs sm:text-sm bg-white/50 dark:bg-slate-800/50 hover:bg-white dark:hover:bg-slate-800 border-slate-200/50 dark:border-slate-700/50 transition-all duration-200 hover:scale-105"
+                    className="h-9 px-4 rounded-full border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 hover:text-red-700 transition-all duration-200 hover:scale-105"
                   >
                     <X className="h-4 w-4 mr-1" />
                     Remove
@@ -225,12 +354,12 @@ Your step-by-step explanation or clarifying questions:`;
                 </div>
                 <AspectRatio
                   ratio={16 / 9}
-                  className="bg-white/50 dark:bg-slate-800/50 rounded-lg overflow-hidden border border-slate-200/50 dark:border-slate-700/50 transition-all duration-200 hover:shadow-lg"
+                  className="bg-white/80 dark:bg-slate-800/50 rounded-xl overflow-hidden border border-slate-200/50 dark:border-slate-600/50 shadow-md hover:shadow-lg transition-all duration-300"
                 >
                   <img
                     src={previewUrl}
                     alt="Selected problem"
-                    className="object-contain w-full h-full transition-transform duration-200 hover:scale-[1.02]"
+                    className="object-contain w-full h-full transition-transform duration-300 hover:scale-[1.02]"
                   />
                 </AspectRatio>
               </div>
@@ -239,32 +368,38 @@ Your step-by-step explanation or clarifying questions:`;
             {selectedFile && (
               <div className="space-y-4">
                 {isLoading && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm text-slate-600 dark:text-slate-400">
-                      <span className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                  <div className="space-y-3 p-4 rounded-xl bg-gradient-to-r from-[#fd6a3e]/5 to-[#022e7d]/5 border border-[#fd6a3e]/20">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2 font-medium text-[#022e7d] dark:text-slate-200">
+                        <Loader2 className="h-4 w-4 animate-spin text-[#fd6a3e]" />
                         {loadingStage === 'uploading' ? 'Uploading image...' : 'Processing image...'}
                       </span>
-                      <span>{progress}%</span>
+                      <span className="font-semibold text-[#fd6a3e]">{progress}%</span>
                     </div>
-                    <Progress value={progress} className="h-2" />
+                    <Progress 
+                      value={progress} 
+                      className="h-3 bg-slate-200/50 dark:bg-slate-700/50"
+                      style={{
+                        background: 'linear-gradient(to right, #fd6a3e, #022e7d)'
+                      }}
+                    />
                   </div>
                 )}
                 <Button
-                  onClick={handleSubmitImage}
+                  onClick={handleProcessImage}
                   disabled={isLoading || !selectedFile}
-                  className="w-full h-11 text-sm md:text-base bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-[1.02] disabled:scale-100 disabled:opacity-50"
+                  className="w-full h-14 text-base font-semibold rounded-2xl bg-gradient-to-r from-[#fd6a3e] to-[#ff8c69] hover:from-[#e55a35] hover:to-[#fd6a3e] text-white shadow-xl hover:shadow-2xl hover:shadow-[#fd6a3e]/30 transition-all duration-300 hover:scale-[1.02] disabled:scale-100 disabled:opacity-50 disabled:hover:shadow-xl process-button border-0"
                 >
                   {isLoading ? (
                     <>
-                      <Loader2 className="mr-2 h-4 w-4 md:h-5 md:w-5 animate-spin" />
+                      <Loader2 className="mr-3 h-6 w-6 animate-spin" />
                       <span className="animate-pulse">
                         {loadingStage === 'uploading' ? 'Uploading...' : 'Processing...'}
                       </span>
                     </>
                   ) : (
                     <>
-                      <Wand2 className="mr-2 h-4 w-4 md:h-5 md:w-5" />
+                      <Wand2 className="mr-3 h-6 w-6" />
                       Extract Text & Ask Nova
                     </>
                   )}
@@ -273,10 +408,37 @@ Your step-by-step explanation or clarifying questions:`;
             )}
           </div>
         </CardContent>
-        <CardFooter className="text-xs text-slate-500 dark:text-slate-400 text-center border-t border-slate-200/50 dark:border-slate-700/50 bg-slate-50/30 dark:bg-slate-800/30">
-          <p>Upload a clear image of your problem for the best results.</p>
+        
+        <CardFooter className="text-center bg-gradient-to-r from-slate-50/50 to-orange-50/30 dark:from-slate-800/30 dark:to-slate-700/30 border-t border-slate-200/50 dark:border-slate-600/50 rounded-b-lg">
+          <p className="text-sm text-slate-600 dark:text-slate-400 mx-auto">
+            📸 Upload a clear image of your problem for the best results
+          </p>
         </CardFooter>
       </Card>
+    
+      {/* Results Card - Only show if we have results */}
+      {result && (
+        <Card className="mt-8 max-w-3xl mx-auto shadow-2xl shadow-[#022e7d]/10 border-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm solution-area">
+          <CardHeader className="bg-gradient-to-r from-[#022e7d]/5 to-[#fd6a3e]/5 rounded-t-lg border-b border-slate-200/50 dark:border-slate-700/50">
+            <CardTitle className="text-2xl font-bold text-[#022e7d] dark:text-slate-100 flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#fd6a3e] to-[#ff8c69] flex items-center justify-center">
+                <span className="text-white font-bold text-sm">✓</span>
+              </div>
+              Extracted Text
+            </CardTitle>
+            <CardDescription className="text-base text-slate-600 dark:text-slate-400">
+              Here's what Nova found in your image
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-800 dark:to-slate-700 p-6 rounded-xl border border-slate-200/50 dark:border-slate-600/50 shadow-inner">
+              <pre className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                {result.text}
+              </pre>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

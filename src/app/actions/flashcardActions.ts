@@ -5,6 +5,7 @@ import Groq from "groq-sdk";
 import { createSupabaseServerActionClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache"; // If you have a page listing flashcard sets
 import { createSupabaseServerComponentClient } from "@/lib/supabase/server";
+import { randomBytes } from "crypto"; // For generating share token
 
 const groqApiKey = process.env.GROQ_API_KEY;
 if (!groqApiKey) console.error("CRITICAL: GROQ_API_KEY for flashcard actions is not set.");
@@ -54,6 +55,8 @@ interface FlashcardSetWithCards { // For sending to client
   learnedCards?: number;
   dueTodayCount?: number;
   masteryPercentage?: number;
+  is_publicly_sharable?: boolean;
+  share_token?: string | null;
 }
 
 interface GetSetResult {
@@ -154,7 +157,7 @@ export async function getFlashcardSetDetailsAction(setId: string): Promise<GetSe
     // Fetch set data
     const { data: setData, error: setError } = await supabase
       .from("flashcard_sets")
-      .select("id, title, description, user_id, created_at, updated_at")
+      .select("id, title, description, user_id, created_at, updated_at, is_publicly_sharable, share_token")
       .eq("id", setId)
       .eq("user_id", user.id)
       .single();
@@ -901,4 +904,103 @@ export async function getStudySessionHistoryAction(setId: string): Promise<Sessi
     return { success: false, error: error.message }; 
   }
   return { success: true, history: data || [] };
+}
+
+// --- Action to Toggle Share Status & Generate Token ---
+export async function toggleFlashcardSetSharingAction(
+  setId: string,
+  makePublic: boolean
+): Promise<{ success: boolean; shareToken?: string | null; error?: string }> {
+  const supabase = createSupabaseServerActionClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { success: false, error: "User not authenticated." };
+  }
+
+  try {
+    let newShareToken: string | null = null;
+    if (makePublic) {
+      // Generate a new unique share token
+      newShareToken = randomBytes(16).toString('hex'); // Generates a 32-char hex string
+    }
+
+    const { data: updateData, error: updateError } = await supabase
+      .from("flashcard_sets")
+      .update({
+        is_publicly_sharable: makePublic,
+        share_token: newShareToken, // Will be null if makePublic is false
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", setId)
+      .eq("user_id", user.id) // Ensure user owns the set
+      .select("share_token") // Select the token to return it
+      .single();
+
+    if (updateError) throw updateError;
+    if (!updateData && makePublic && !updateError) {
+        // If makePublic is true, we expect updateData to exist because of .select().single()
+        // If it's null and there's no error, it means the record wasn't found or RLS prevented update/select.
+        throw new Error("Failed to update set or retrieve share token. Ensure the set exists and you have permissions.");
+    }
+
+    revalidatePath("/flashcards"); // Revalidate list of sets
+    revalidatePath(`/flashcards/set/${setId}`); // Revalidate the specific set page
+    if (makePublic && updateData?.share_token) {
+        revalidatePath(`/flashcards/shared/${updateData.share_token}`);
+    }
+
+    return { success: true, shareToken: makePublic ? updateData?.share_token : null };
+
+  } catch (error: any) {
+    console.error(`Error toggling share status for set ${setId}:`, error);
+    return { success: false, error: `Could not update share status: ${error.message}` };
+  }
+}
+
+// --- Action to Fetch a Publicly Shared Set (using share_token) ---
+export async function getPublicFlashcardSetByTokenAction(
+  shareToken: string
+): Promise<{ success: boolean; set?: FlashcardSetWithCards & { creatorName?: string }; error?: string }> {
+  if (!shareToken) return { success: false, error: "Share token is required." };
+
+  const supabase = createSupabaseServerActionClient();
+
+  try {
+    const { data: setData, error: setError } = await supabase
+      .from("flashcard_sets")
+      .select("id, title, description, user_id, created_at, updated_at, is_publicly_sharable, share_token, owner_profile:profiles(full_name, avatar_url)") // Fetch owner profile info
+      .eq("share_token", shareToken)
+      .eq("is_publicly_sharable", true) // Ensure it's still sharable
+      .single();
+
+    if (setError) throw setError;
+    if (!setData) return { success: false, error: "Shared flashcard set not found or no longer available." };
+
+    // Fetch cards for this public set
+    const { data: cardsData, error: cardsError } = await supabase
+      .from("flashcards")
+      .select("id, question, answer") // Only public fields
+      .eq("set_id", setData.id)
+      // No user_id check here, relying on the set being publicly sharable via token
+      .order("created_at", { ascending: true }); // Or use 'order_in_quiz' if available
+
+    if (cardsError) throw cardsError;
+    
+    const creatorName = (setData.owner_profile as any)?.full_name || "Anonymous Creator";
+
+    const setWithCards: FlashcardSetWithCards & { creatorName?: string } = {
+      ...setData,
+      flashcards: (cardsData || []).map(c => ({ ...c, set_id: setData.id })) as FlashcardForClient[], // Ensure cards conform to FlashcardForClient if needed
+      totalCards: cardsData?.length || 0,
+      creatorName: creatorName,
+      // Note: is_publicly_sharable and share_token are already part of setData
+    };
+
+    return { success: true, set: setWithCards };
+
+  } catch (error: any) {
+    console.error(`Error fetching public set with token ${shareToken}:`, error);
+    return { success: false, error: `Could not load shared set: ${error.message}` };
+  }
 }

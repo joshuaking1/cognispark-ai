@@ -19,7 +19,6 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
@@ -47,40 +46,64 @@ export default function LoginPage() {
 
   return (
     <div className="container relative h-screen flex-col items-center justify-center grid lg:max-w-none lg:grid-cols-2 lg:px-0">
-      <div className="relative hidden h-full flex-col bg-muted p-10 text-white lg:flex dark:border-r">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-purple-700" />
+      <div className="relative hidden h-full flex-col p-10 text-white lg:flex dark:border-r">
+        <div className="absolute inset-0" style={{
+          background: `linear-gradient(135deg, #022e7d 0%, #fd6a3e 50%, #ff8a65 100%)`
+        }} />
+        <div className="absolute inset-0 bg-black/10" />
+        
         <div className="relative z-20 flex items-center text-lg font-medium">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="mr-2 h-6 w-6"
-          >
-            <path d="m8 3 4 8 5-5v11H5V11l3-8Z" />
-          </svg>
+          <div className="mr-3 p-2 rounded-lg bg-white/10 backdrop-blur-sm">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="h-6 w-6"
+            >
+              <path d="m8 3 4 8 5-5v11H5V11l3-8Z" />
+            </svg>
+          </div>
           CogniSpark AI
         </div>
+        
         <div className="relative z-20 mt-auto">
-          <blockquote className="space-y-2">
-            <p className="text-lg">
-              &ldquo;This platform has revolutionized how we approach AI-driven insights and analytics.&rdquo;
-            </p>
-            <footer className="text-sm">Sofia Davis</footer>
-          </blockquote>
+          <div className="p-8 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20">
+            <blockquote className="space-y-4">
+              <p className="text-lg leading-relaxed">
+                &ldquo;LearnBridge Edu has profoundly transformed our educational approach. The AI-generated lesson plans and real-time analytics have significantly reduced administrative burdens, allowing our teachers to dedicate more time to student engagement.&rdquo;
+              </p>
+              <footer className="text-sm opacity-90 font-medium">
+                Dina Akosua Mintah - Head Mistress<br />
+                Ghana Senior High School
+              </footer>
+            </blockquote>
+          </div>
         </div>
       </div>
-      <div className="relative lg:p-8 flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-        <div className="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,#fff,rgba(255,255,255,0.6))] dark:bg-grid-slate-700/25 dark:[mask-image:linear-gradient(0deg,rgba(255,255,255,0.1),rgba(255,255,255,0.5))]" />
+
+      <div className="relative lg:p-8 flex items-center justify-center min-h-screen" style={{
+        background: `linear-gradient(135deg, #fef7f0 0%, #f0f4ff 50%, #fef7f0 100%)`
+      }}>
+        <div className="absolute inset-0 opacity-30" style={{
+          backgroundImage: `radial-gradient(circle at 20% 50%, rgba(253, 106, 62, 0.1) 0%, transparent 50%), 
+                           radial-gradient(circle at 80% 20%, rgba(2, 46, 125, 0.1) 0%, transparent 50%),
+                           radial-gradient(circle at 40% 80%, rgba(253, 106, 62, 0.05) 0%, transparent 50%)`
+        }} />
         
-        <Card className="relative w-full max-w-md mx-4 shadow-2xl border-0 bg-white/95 backdrop-blur-sm dark:bg-slate-900/95">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg" />
+        <Card className="relative w-full max-w-md mx-4 shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
+          <div className="absolute inset-0 rounded-lg" style={{
+            background: `linear-gradient(135deg, rgba(2, 46, 125, 0.05) 0%, rgba(253, 106, 62, 0.05) 100%)`
+          }} />
+          
           <CardHeader className="relative space-y-4 pb-8">
             <div className="flex justify-center mb-4">
-              <div className="p-3 rounded-full bg-gradient-to-r from-blue-500 to-purple-600">
+              <div className="p-4 rounded-full shadow-lg" style={{
+                background: `linear-gradient(135deg, #fd6a3e 0%, #022e7d 100%)`
+              }}>
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 24 24"
@@ -89,31 +112,36 @@ export default function LoginPage() {
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="h-6 w-6 text-white"
+                  className="h-8 w-8 text-white"
                 >
                   <path d="m8 3 4 8 5-5v11H5V11l3-8Z" />
                 </svg>
               </div>
             </div>
-            <CardTitle className="text-3xl font-bold text-center bg-gradient-to-r from-slate-900 to-slate-700 dark:from-slate-100 dark:to-slate-300 bg-clip-text text-transparent">
+            <CardTitle className="text-3xl font-bold text-center" style={{
+              background: `linear-gradient(135deg, #022e7d 0%, #fd6a3e 100%)`,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text'
+            }}>
               Welcome back
             </CardTitle>
-            <CardDescription className="text-center text-slate-600 dark:text-slate-400 text-base">
+            <CardDescription className="text-center text-slate-600 text-base">
               Sign in to your CogniSpark AI account
             </CardDescription>
           </CardHeader>
           
           <CardContent className="relative space-y-6">
             {error && (
-              <Alert variant="destructive" className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
-                <AlertDescription className="text-red-700 dark:text-red-400">{error}</AlertDescription>
+              <Alert className="border-red-200 bg-red-50">
+                <AlertDescription className="text-red-700">{error}</AlertDescription>
               </Alert>
             )}
             
             <form onSubmit={handleLogin} className="space-y-6">
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  <Label htmlFor="email" className="text-sm font-medium text-slate-700">
                     Email Address
                   </Label>
                   <div className="relative">
@@ -128,13 +156,28 @@ export default function LoginPage() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      className="h-12 pl-4 text-base bg-slate-50 border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-blue-500/20 dark:bg-slate-800 dark:border-slate-700 dark:focus:border-blue-400"
+                      className="h-12 pl-4 text-base bg-slate-50 border-slate-200 focus:bg-white transition-all duration-200"
+                      style={{
+                        borderColor: '#e2e8f0',
+                        '&:focus': {
+                          borderColor: '#fd6a3e',
+                          boxShadow: `0 0 0 3px rgba(253, 106, 62, 0.1)`
+                        }
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#fd6a3e';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(253, 106, 62, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = '#e2e8f0';
+                        e.target.style.boxShadow = 'none';
+                      }}
                     />
                   </div>
                 </div>
                 
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  <Label htmlFor="password" className="text-sm font-medium text-slate-700">
                     Password
                   </Label>
                   <div className="relative">
@@ -147,7 +190,15 @@ export default function LoginPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
-                      className="h-12 pl-4 text-base bg-slate-50 border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-blue-500/20 dark:bg-slate-800 dark:border-slate-700 dark:focus:border-blue-400"
+                      className="h-12 pl-4 text-base bg-slate-50 border-slate-200 focus:bg-white transition-all duration-200"
+                      onFocus={(e) => {
+                        e.target.style.borderColor = '#fd6a3e';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(253, 106, 62, 0.1)';
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = '#e2e8f0';
+                        e.target.style.boxShadow = 'none';
+                      }}
                     />
                   </div>
                 </div>
@@ -156,7 +207,19 @@ export default function LoginPage() {
               <Button 
                 disabled={loading} 
                 type="submit" 
-                className="w-full h-12 text-base font-medium bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 border-0 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]"
+                className="w-full h-12 text-base font-semibold text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] hover:shadow-2xl"
+                style={{
+                  background: `linear-gradient(135deg, #fd6a3e 0%, #022e7d 100%)`,
+                  boxShadow: `0 10px 25px rgba(253, 106, 62, 0.3)`
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = `linear-gradient(135deg, #ff7849 0%, #033a94 100%)`;
+                  e.currentTarget.style.boxShadow = `0 15px 35px rgba(253, 106, 62, 0.4)`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = `linear-gradient(135deg, #fd6a3e 0%, #022e7d 100%)`;
+                  e.currentTarget.style.boxShadow = `0 10px 25px rgba(253, 106, 62, 0.3)`;
+                }}
               >
                 {loading ? (
                   <>
@@ -172,11 +235,20 @@ export default function LoginPage() {
           
           <CardFooter className="relative pt-6">
             <div className="w-full text-center">
-              <p className="text-slate-600 dark:text-slate-400">
+              <p className="text-slate-600">
                 Don&apos;t have an account?{" "}
                 <Link
                   href="/signup"
-                  className="font-semibold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200"
+                  className="font-semibold transition-colors duration-200 hover:underline"
+                  style={{
+                    color: '#fd6a3e'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#022e7d';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = '#fd6a3e';
+                  }}
                 >
                   Create one here
                 </Link>

@@ -1,4 +1,3 @@
-// src/components/chat/ChatInterface.tsx
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -16,82 +15,19 @@ import {
   Volume2 as Volume2Icon,
   VolumeX as VolumeXIcon,
   MessageSquare,
-  Sparkles,
-  Clock
+  Menu as MenuIcon,
+  Clock,
+  Settings2 // Example for a potential settings icon
 } from "lucide-react";
 import { toast } from "sonner";
 import { useChat, type Message as VercelAIMessage } from "ai/react";
 import { format, isToday, isYesterday } from "date-fns";
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 
-// Add Web Speech API type declarations
-interface SpeechRecognitionEvent extends Event {
-  resultIndex: number;
-  results: SpeechRecognitionResultList;
-}
-
-interface SpeechRecognitionError {
-  error: string;
-  message: string;
-}
-
-interface SpeechRecognitionResultList {
-  length: number;
-  item(index: number): SpeechRecognitionResult;
-  [index: number]: SpeechRecognitionResult;
-}
-
-interface SpeechRecognitionResult {
-  isFinal: boolean;
-  length: number;
-  item(index: number): SpeechRecognitionAlternative;
-  [index: number]: SpeechRecognitionAlternative;
-}
-
-interface SpeechRecognitionAlternative {
-  transcript: string;
-  confidence: number;
-}
-
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  maxAlternatives: number;
-  onaudioend: ((this: SpeechRecognition, ev: Event) => any) | null;
-  onaudiostart: ((this: SpeechRecognition, ev: Event) => any) | null;
-  onend: ((this: SpeechRecognition, ev: Event) => any) | null;
-  onerror: ((this: SpeechRecognition, ev: Event) => any) | null;
-  onnomatch: ((this: SpeechRecognition, ev: Event) => any) | null;
-  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null;
-  onsoundend: ((this: SpeechRecognition, ev: Event) => any) | null;
-  onsoundstart: ((this: SpeechRecognition, ev: Event) => any) | null;
-  onspeechend: ((this: SpeechRecognition, ev: Event) => any) | null;
-  onspeechstart: ((this: SpeechRecognition, ev: Event) => any) | null;
-  onstart: ((this: SpeechRecognition, ev: Event) => any) | null;
-  start(): void;
-  stop(): void;
-  abort(): void;
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition: new () => SpeechRecognition;
-    webkitSpeechRecognition: new () => SpeechRecognition;
-  }
-}
-
-// Helper function to get search params
-const getSearchParams = () => {
-  const [params] = useSearchParams();
-  return params;
-};
-
 import { getMessagesForConversation, getConversationsListAction } from "@/app/actions/chatActions";
 import { generateConversationTitle } from "@/app/actions/generateConversationTitleAction";
 import ChatMessageContentRenderer from "./ChatMessageContentRenderer";
 
-// Define DisplayMessage structure for UI rendering
 interface DisplayMessage extends VercelAIMessage {
   createdAt: Date;
 }
@@ -101,31 +37,33 @@ interface Conversation {
   title: string;
 }
 
-// Web Speech API instances
 let recognition: SpeechRecognition | null = null;
-// let speechSynthesisUtterance: SpeechSynthesisUtterance | null = null; // Removed
+
+const BRAND_ORANGE = "#fd6a3e";
+const BRAND_BLUE = "#022e7d";
 
 export default function ChatInterface() {
-  const [isVoiceInputActive, setIsVoiceInputActive] = useState(false);
-  const [isTTSActive, setIsTTSActive] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null); // Ref for textarea focus
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  // UI specific states
+  
   const [isSidebarLoading, setIsSidebarLoading] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  
+  const toggleSidebar = () => {
+    setIsMobileSidebarOpen(prev => !prev);
+  };
+
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [isTTSEnabled, setIsTTSEnabled] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [audioQueue, setAudioQueue] = useState<string[]>([]);
-  const [isProcessingQueue, setIsProcessingQueue] = useState(false);
-  const scrollArea = scrollAreaRef.current;
-  const audioRef = useRef<HTMLAudioElement | null>(null); // For playing audio stream
+  const audioRef = useRef<HTMLAudioElement | null>(null); 
 
-  // Vercel AI SDK's useChat hook
   const {
     messages,
     input,
@@ -145,24 +83,24 @@ export default function ChatInterface() {
       const newConversationId = response.headers.get('X-Conversation-Id');
       if (newConversationId && currentConversationId !== newConversationId) {
         setCurrentConversationId(newConversationId);
+        const newParams = new URLSearchParams(searchParams.toString());
+        newParams.set('conversationId', newConversationId);
+        router.push(`${pathname}?${newParams.toString()}`, { scroll: false });
       }
     },
     onFinish: async (message) => {
       if (isTTSEnabled && message.role === 'assistant' && message.content) {
         await playNovaResponse(message.content);
       }
-      
-      const activeConversationId = currentConversationId || messages.find(m=>m.role==='assistant')?.id;
-
+      const activeConversationId = currentConversationId || messages.find(m=>m.role==='assistant')?.id?.split('_')[0];
       if (activeConversationId) {
           loadConversationsList();
           const MIN_MESSAGES_FOR_TITLE_GEN = 2;
-          const currentConvoMessages = messages.filter(m => !activeConversationId || m.id.startsWith(activeConversationId.substring(0,5)));
+          const currentConvoMessages = messages.filter(m => m.id && (!activeConversationId || true)); 
           const convoDetails = conversations.find(c => c.id === activeConversationId);
           const firstUserMessageContent = currentConvoMessages.find(m => m.role === 'user')?.content || "";
-
           if (currentConvoMessages.length >= MIN_MESSAGES_FOR_TITLE_GEN &&
-              (!convoDetails || (firstUserMessageContent && convoDetails.title.startsWith(firstUserMessageContent.substring(0,10))) || !convoDetails.title)
+              (!convoDetails || !convoDetails.title || (convoDetails.title === "New Chat" || convoDetails.title.startsWith("Untitled") || (firstUserMessageContent && convoDetails.title.startsWith(firstUserMessageContent.substring(0,20)))))
           ) {
             generateConversationTitle(activeConversationId)
               .then(result => { if (result.success) loadConversationsList(); })
@@ -175,75 +113,11 @@ export default function ChatInterface() {
     }
   });
 
-  // Mapped messages for display with guaranteed Date objects
   const displayMessages: DisplayMessage[] = messages.map((message) => ({
     ...message,
     createdAt: message.createdAt ? new Date(message.createdAt) : new Date(),
   }));
-
-  // Handle URL search parameters and conversation selection
-  useEffect(() => {
-    if (typeof window === 'undefined') return; // Skip during SSR
-
-    const urlSearchParams = new URLSearchParams(window.location.search);
-    const prefillMessage = urlSearchParams.get('prefill');
-    const requestedConversationId = urlSearchParams.get('conversationId');
-    let hasProcessedQuery = false;
-
-    if (requestedConversationId) {
-      if (requestedConversationId !== currentConversationId) { // Only load if it's a different convo
-        selectConversation(requestedConversationId);
-      }
-      hasProcessedQuery = true;
-    } else if (prefillMessage) {
-      if (currentConversationId) { // If on an existing convo and prefill comes, assume new chat with prefill
-        handleNewConversation();
-      }
-      setInput(decodeURIComponent(prefillMessage));
-      hasProcessedQuery = true;
-    } else if (!currentConversationId && conversations.length > 0) {
-      // Optionally auto-select most recent from sidebar
-      // selectConversation(conversations[0].id);
-    }
-
-    if (hasProcessedQuery) {
-      const currentPath = window.location.pathname;
-      router.replace(currentPath, { scroll: false }); // Clean URL
-    }
-  }, [searchParams, conversations, router, setInput]); // Removed window.location.search from deps
-
-  // Function to select a conversation
-  const selectConversation = useCallback(async (conversationId: string) => {
-    setIsHistoryLoading(true);
-    try {
-      const messages = await getMessagesForConversation(conversationId);
-      const formattedMessages = messages.map(msg => ({
-        id: msg.id!,
-        role: msg.sender as "user" | "assistant",
-        content: msg.content,
-        createdAt: new Date(msg.created_at!)
-      }));
-      setVercelMessages(formattedMessages);
-      setCurrentConversationId(conversationId);
-      setInput(''); // Clear input when switching conversations
-    } catch (err) {
-      console.error('Error loading conversation:', err);
-      toast.error('Failed to load conversation');
-    } finally {
-      setIsHistoryLoading(false);
-    }
-  }, [setVercelMessages, setInput]);
-
-  const scrollToBottom = useCallback((behavior: 'auto' | 'smooth' = 'auto') => {
-    const scrollArea = scrollAreaRef.current;
-    if (scrollArea) {
-      const viewport = scrollArea.querySelector('div[style*="overflow: scroll;"]') as HTMLElement;
-      if (viewport) {
-        viewport.scrollTo({ top: viewport.scrollHeight, behavior: behavior });
-      }
-    }
-  }, []);
-
+  
   const loadConversationsList = useCallback(async () => {
     setIsSidebarLoading(true);
     try {
@@ -251,21 +125,29 @@ export default function ChatInterface() {
       setConversations(convos);
     } catch (e) {
       console.error("Failed to load conversations list:", e);
-      toast.error("Could not load your past conversations.");
+      // toast.error("Could not load your past conversations."); // Potentially too noisy
     } finally {
       setIsSidebarLoading(false);
     }
   }, []);
 
   const loadMessagesForSelectedConvo = useCallback(async (convoId: string | null) => {
-    if (convoId === null) {
+    if (convoId === null) { 
       setVercelMessages([]);
       setCurrentConversationId(null);
       setInput('');
+      const newParams = new URLSearchParams(searchParams.toString());
+      newParams.delete('conversationId');
+      newParams.delete('prefill'); 
+      router.push(`${pathname}${newParams.toString() ? '?' + newParams.toString() : ''}`, { scroll: false });
+      inputRef.current?.focus();
       return;
     }
-    if (convoId === currentConversationId && messages.length > 0) return;
-
+    if (convoId === currentConversationId && messages.length > 0 && !searchParams.get('prefill')) {
+      if (isMobileSidebarOpen) setIsMobileSidebarOpen(false);
+      inputRef.current?.focus();
+      return;
+    }
     setIsHistoryLoading(true);
     try {
       const dbMessages = await getMessagesForConversation(convoId);
@@ -278,484 +160,338 @@ export default function ChatInterface() {
       setVercelMessages(formattedVercelMessages);
       setCurrentConversationId(convoId);
       setInput('');
-      loadConversationsList();
+      if (isMobileSidebarOpen) setIsMobileSidebarOpen(false); 
+      const newParams = new URLSearchParams(searchParams.toString());
+      newParams.set('conversationId', convoId);
+      newParams.delete('prefill'); 
+      router.push(`${pathname}?${newParams.toString()}`, { scroll: false });
+      inputRef.current?.focus();
     } catch (e) {
-      console.error("Failed to load messages:", e);
-      toast.error("Could not load chat history for this conversation.");
-      setCurrentConversationId(null);
+      console.error("Failed to load messages for convo " + convoId + ":", e);
+      toast.error("Could not load chat history.");
     } finally {
       setIsHistoryLoading(false);
     }
-  }, [setVercelMessages, setInput, currentConversationId, loadConversationsList]);
+  }, [setVercelMessages, setInput, currentConversationId, messages.length, router, pathname, searchParams, isMobileSidebarOpen]);
 
-  // Initial load of conversations
+  useEffect(() => {
+    const convoIdFromUrl = searchParams.get('conversationId');
+    const prefillMessageFromUrl = searchParams.get('prefill');
+    if (convoIdFromUrl) {
+      if (convoIdFromUrl !== currentConversationId) {
+        loadMessagesForSelectedConvo(convoIdFromUrl);
+      }
+      if (prefillMessageFromUrl) {
+        const newSp = new URLSearchParams(searchParams.toString());
+        newSp.delete('prefill');
+        router.replace(`${pathname}?${newSp.toString()}`, { scroll: false });
+      }
+    } else if (prefillMessageFromUrl) {
+      setVercelMessages([]);
+      setCurrentConversationId(null); 
+      setInput(decodeURIComponent(prefillMessageFromUrl));
+      const newSp = new URLSearchParams(searchParams.toString());
+      newSp.delete('prefill');
+      router.replace(`${pathname}?${newSp.toString()}`, { scroll: false });
+      inputRef.current?.focus();
+    }
+  }, [searchParams]); // Simplified deps, let internal calls manage their own reactive updates.
+
   useEffect(() => {
     loadConversationsList();
   }, [loadConversationsList]);
 
-  // Handle conversationId and prefill from URL
-  useEffect(() => {
-    const urlSearchParams = new URLSearchParams(window.location.search);
-    const prefillMessage = urlSearchParams.get('prefill');
-    const requestedConversationId = urlSearchParams.get('conversationId');
-
-    let hasProcessedQuery = false;
-
-    if (requestedConversationId) {
-      if (requestedConversationId !== currentConversationId) {
-        loadMessagesForSelectedConvo(requestedConversationId);
-      }
-      hasProcessedQuery = true;
-    } else if (prefillMessage) {
-      setVercelMessages([]);
-      setCurrentConversationId(null);
-      setInput(decodeURIComponent(prefillMessage));
-      hasProcessedQuery = true;
-    } else {
-      loadConversationsList();
-    }
-
-    if (hasProcessedQuery && pathname) {
-      router.replace(pathname, { scroll: false });
-    }
-  }, [window.location.search, setInput, router, pathname, currentConversationId, loadMessagesForSelectedConvo, setVercelMessages]);
-
-  // Scroll to bottom when new messages arrive or loading state changes
-  useEffect(() => {
-    const scrollArea = scrollAreaRef.current;
-    if (scrollArea && (displayMessages.length > 0 || chatIsLoading)) {
-      const viewport = scrollArea.querySelector('div[style*="overflow: scroll;"]') as HTMLElement;
-      if (viewport) {
-        viewport.scrollTo({ 
-          top: viewport.scrollHeight, 
-          behavior: chatIsLoading ? 'auto' : 'smooth' 
-        });
+  useEffect(() => { // Auto-scroll logic
+    const scrollViewport = scrollAreaRef.current?.querySelector('div[style*="overflow: scroll;"]') as HTMLElement;
+    if (scrollViewport) {
+      const isUserTyping = document.activeElement === inputRef.current && input.length > 0;
+      if (isUserTyping && chatIsLoading) { // If user submitted and AI is responding, scroll smoothly
+          setTimeout(() => scrollViewport.scrollTo({ top: scrollViewport.scrollHeight, behavior: 'smooth' }), 100);
+      } else if (!isUserTyping) { // General scroll for new messages if not actively typing in a way that suggests user wants control
+          const lastMessage = displayMessages[displayMessages.length - 1];
+          // Scroll if AI just responded or if close to bottom
+          const isScrolledToBottom = scrollViewport.scrollHeight - scrollViewport.clientHeight <= scrollViewport.scrollTop + 150;
+          if ( (lastMessage?.role === 'assistant' && messages[messages.length -1]?.id === lastMessage.id) || isScrolledToBottom ) {
+              scrollViewport.scrollTo({ top: scrollViewport.scrollHeight, behavior: 'smooth' });
+          }
       }
     }
-  }, [displayMessages, chatIsLoading]);
+  }, [displayMessages, chatIsLoading, input]); // Added input to deps for typing check consideration
 
-  // Speech Recognition and Synthesis Effect
-  useEffect(() => {
+  useEffect(() => { // Speech Recognition Effect
     if (typeof window !== 'undefined') {
-      const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
       if (SpeechRecognitionAPI) {
         recognition = new SpeechRecognitionAPI();
-        if (recognition) {
-          recognition.continuous = false;
-          recognition.interimResults = false;
-          recognition.lang = 'en-US';
-
-          recognition.onresult = (event: SpeechRecognitionEvent) => {
-            const transcript = event.results[event.results.length - 1][0].transcript.trim();
-            setInput(prevInput => prevInput ? `${prevInput} ${transcript}` : transcript);
-            setIsListening(false);
-          };
-          recognition.onerror = (event: Event) => {
-            const errorEvent = event as unknown as SpeechRecognitionError;
-            toast.error("Voice Error", { description: `Could not recognize speech: ${errorEvent.error}` });
-            setIsListening(false);
-          };
-          recognition.onend = () => setIsListening(false);
-        }
-      } else {
-        console.warn('Speech Recognition API not supported.');
-      }
+        recognition.continuous = false;recognition.interimResults = false; recognition.lang = 'en-US';
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
+          const transcript = event.results[event.results.length - 1][0].transcript.trim();
+          setInput(prevInput => prevInput ? `${prevInput} ${transcript}` : transcript); setIsListening(false);
+        };
+        recognition.onerror = (event: Event) => {
+          const errorEvent = event as unknown as SpeechRecognitionError;
+          toast.error("Voice Error", { description: `Could not recognize speech: ${errorEvent.error}` }); setIsListening(false);
+        };
+        recognition.onend = () => setIsListening(false);
+      } else { console.warn('Speech Recognition API not supported.');}
     }
     return () => {
-      if (recognition && isListening) recognition.stop();
+      if (recognition && isListening) { recognition.stop(); }
       if (audioRef.current) {
         audioRef.current.pause();
+        if(audioRef.current.src.startsWith('blob:')) URL.revokeObjectURL(audioRef.current.src);
         audioRef.current.src = '';
       }
     };
   }, [setInput, isListening]);
 
   const toggleVoiceInput = () => {
-    if (!recognition) {
-      toast.error("Voice input is not supported by your browser.");
-      return;
-    }
-    if (isListening) {
-      recognition.stop();
-    } else {
-      try {
-        setIsListening(true);
-        recognition.start();
-        toast.info("Listening...", { duration: 2500 });
-      } catch (e) {
-        toast.error("Voice Error", { description: "Could not start voice input." });
-        setIsListening(false);
-      }
+    if (!recognition) { toast.error("Voice input is not supported by your browser."); return; }
+    if (isListening) { recognition.stop(); } else {
+      try { setIsListening(true); setInput(''); recognition.start(); toast.info("Listening...", { duration: 3500 });
+      } catch (e) { toast.error("Voice Error", { description: "Could not start voice input." }); setIsListening(false); }
     }
   };
-
-  const playNovaResponse = async (textToSpeak: string) => {
-    if (isSpeaking) { // If already speaking, stop previous
-      if (audioRef.current) {
+  const playNovaResponse = async (textToSpeak: string) => { 
+    if (isSpeaking && audioRef.current) { 
         audioRef.current.pause();
-        audioRef.current.src = ""; // Detach source
-      }
-      setIsSpeaking(false);
+        if(audioRef.current.src.startsWith('blob:')) URL.revokeObjectURL(audioRef.current.src);
+        audioRef.current.src = ""; setIsSpeaking(false);
     }
-
     setIsSpeaking(true);
     try {
-      const response = await fetch('/api/tts/nova-speak', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: textToSpeak }),
-      });
-
-      if (!response.ok) {
-        const contentType = response.headers.get('content-type');
-        if (contentType?.includes('application/json')) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || `TTS service failed with status ${response.status}`);
-        } else {
-          throw new Error(`TTS service failed with status ${response.status}`);
+        const response = await fetch('/api/tts/nova-speak', {method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: textToSpeak })});
+        if (!response.ok || !response.body) {
+            const errorData = response.headers.get('content-type')?.includes('application/json') ? await response.json() : { error: `TTS service failed: ${response.statusText || response.status}` };
+            throw new Error(errorData.error || `TTS service failed`);
         }
-      }
-
-      if (!response.body) {
-        throw new Error('No audio data received from TTS service');
-      }
-
-      // Create an Audio element to play the stream
-      if (!audioRef.current) {
-        audioRef.current = new Audio();
-      }
-      const audio = audioRef.current;
-      
-      // Get a reader from the response body stream
-      const reader = response.body.getReader();
-      // Create a new ReadableStream from the reader to build up the blob URL
-      const stream = new ReadableStream({
-        start(controller) {
-          function push() {
-            reader.read().then(({ done, value }) => {
-              if (done) {
-                controller.close();
-                return;
-              }
-              controller.enqueue(value);
-              push();
-            }).catch(error => {
-              console.error("Error reading TTS stream:", error);
-              controller.error(error);
-            });
-          }
-          push();
-        }
-      });
-
-      // Create a new response from the stream to get a Blob
-      const blobResponse = new Response(stream);
-      const blob = await blobResponse.blob(); // Get the entire audio as a blob
-      const audioUrl = URL.createObjectURL(blob); // Create a URL for the blob
-
-      audio.src = audioUrl;
-      audio.play()
-        .catch(e => {
-            console.error("Audio play error:", e);
-            toast.error("Playback Error", { 
-              description: "Could not play Nova's voice. Please check your browser's audio settings."
-            });
-            setIsSpeaking(false);
-        });
-
-      audio.onended = () => {
-        setIsSpeaking(false);
-        URL.revokeObjectURL(audioUrl); // Clean up blob URL
-      };
-      audio.onerror = (e) => {
-        console.error("Audio element error:", e);
-        toast.error("Audio Error", { 
-          description: "An error occurred with Nova's voice playback. Please try again."
-        });
-        setIsSpeaking(false);
-        URL.revokeObjectURL(audioUrl); // Clean up
-      };
-
-    } catch (error: any) {
-      console.error("playNovaResponse error:", error);
-      toast.error("TTS Failed", { 
-        description: error.message || "Could not generate Nova's voice. Please try again."
-      });
-      setIsSpeaking(false);
-    }
+        const audioBlob = await response.blob(); const audioUrl = URL.createObjectURL(audioBlob);
+        if (!audioRef.current) { audioRef.current = new Audio(); }
+        const audio = audioRef.current; audio.src = audioUrl;
+        audio.play().catch(e => { console.error("Audio play error:", e); toast.error("Playback Error", { description: "Could not play Nova's voice. Check audio settings."}); setIsSpeaking(false); URL.revokeObjectURL(audioUrl); });
+        audio.onended = () => { setIsSpeaking(false); URL.revokeObjectURL(audioUrl); };
+        audio.onerror = (e) => { console.error("Audio element error:", e); toast.error("Audio Error", { description: "Error with Nova's voice playback."}); setIsSpeaking(false); URL.revokeObjectURL(audioUrl); };
+    } catch (error: any) { console.error("playNovaResponse error:", error); toast.error("TTS Failed", { description: error.message || "Could not generate Nova's voice."}); setIsSpeaking(false); }
   };
-
-  const toggleTTS = () => {
+  const toggleTTS = () => { 
     setIsTTSEnabled(prev => {
       const newState = !prev;
       if (!newState && audioRef.current && !audioRef.current.paused) {
-        audioRef.current.pause();
-        audioRef.current.src = ""; // Detach source
-        setIsSpeaking(false);
+        audioRef.current.pause(); if(audioRef.current.src.startsWith('blob:')) URL.revokeObjectURL(audioRef.current.src);
+        audioRef.current.src = ""; setIsSpeaking(false);
       }
-      toast.info(newState ? "Nova's premium voice enabled" : "Nova's voice disabled");
-      return newState;
+      toast.info(newState ? "Nova's voice enabled" : "Nova's voice disabled"); return newState;
     });
   };
-
-  // Cleanup audio element on unmount
-  useEffect(() => {
+  useEffect(() => { 
     return () => {
       if (audioRef.current) {
-        audioRef.current.pause();
+        audioRef.current.pause(); if(audioRef.current.src.startsWith('blob:')) URL.revokeObjectURL(audioRef.current.src);
         audioRef.current.src = '';
       }
     };
   }, []);
 
-  const handleNewConversation = () => {
-    loadMessagesForSelectedConvo(null);
-  };
-
-  const customSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    handleSubmit(e, {
-      body: {
-        conversationId: currentConversationId
-      }
-    });
+  const handleNewConversation = () => { loadMessagesForSelectedConvo(null); };
+  const customSubmit = (e: React.FormEvent<HTMLFormElement>) => { 
+    e.preventDefault(); if (!input.trim()) return; 
+    handleSubmit(e, { body: { conversationId: currentConversationId }});
   };
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-950 dark:to-slate-900">
-      {/* Sidebar - Hidden on mobile */}
-      <div className="hidden md:flex w-80 sticky top-0 h-screen bg-slate-50/30 dark:bg-slate-900/30 backdrop-blur-sm border-r border-slate-200/20 dark:border-slate-700/20 flex-col">
-        {/* Sidebar Header */}
-        <div className="p-6 border-b border-slate-200/20 dark:border-slate-700/20 bg-gradient-to-r from-blue-600/90 to-purple-600/90 backdrop-blur-sm">
+    <div className="flex h-screen antialiased text-slate-800 dark:text-slate-100 bg-white dark:bg-neutral-900">
+      {isMobileSidebarOpen && (
+        <div 
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+          onClick={toggleSidebar} 
+        />
+      )}
+      {/* Sidebar */}
+      <div className={`fixed inset-y-0 left-0 z-40 w-72 bg-neutral-50 dark:bg-neutral-800 border-r border-neutral-200 dark:border-neutral-700/60 flex flex-col transition-transform duration-300 ease-in-out md:sticky md:translate-x-0 ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="p-4 flex-shrink-0 border-b border-neutral-200 dark:border-neutral-700/60">
           <Button 
             onClick={handleNewConversation} 
-            className="w-full h-12 bg-white/10 hover:bg-white/20 text-white border-white/20 backdrop-blur-sm font-medium transition-all duration-200"
-            variant="outline"
+            className={`w-full h-10 bg-[${BRAND_ORANGE}] hover:bg-orange-500 text-white font-medium transition-all duration-200 rounded-md shadow-sm hover:shadow focus-visible:ring-2 focus-visible:ring-[${BRAND_ORANGE}] focus-visible:ring-offset-2 dark:focus-visible:ring-offset-neutral-800`}
           >
-            <PlusIcon className="mr-2 h-5 w-5" />
-            Start New Chat
+            <PlusIcon className="mr-2 h-4 w-4" />
+            New Chat
           </Button>
         </div>
 
-        {/* Conversations Header */}
-        <div className="px-6 py-4 border-b border-slate-200/20 dark:border-slate-700/20 bg-slate-50/30 dark:bg-slate-800/30 backdrop-blur-sm">
+        <div className="px-4 py-3 border-b border-neutral-200 dark:border-neutral-700/60 flex-shrink-0">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-slate-500" />
-              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Recent Chats</h3>
-            </div>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={loadConversationsList} 
-              disabled={isSidebarLoading} 
-              className="h-8 w-8 p-0 hover:bg-slate-200/30 dark:hover:bg-slate-700/30"
+            <h3 className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">Recent</h3>
+             <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleSidebar} 
+              className="md:hidden h-8 w-8 rounded-md text-neutral-500 hover:bg-neutral-200 dark:text-neutral-400 dark:hover:bg-neutral-700"
+              aria-label="Close sidebar"
             >
-              <UpdateIcon className={`h-4 w-4 ${isSidebarLoading ? "animate-spin" : ""}`} />
+              <MenuIcon className="h-5 w-5" /> 
             </Button>
           </div>
         </div>
-
-        {/* Conversations List */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-3 space-y-2">
-            {isSidebarLoading && conversations.length === 0 && 
-              Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full rounded-xl bg-slate-200/20 dark:bg-slate-700/20" />
-              ))
-            }
-            
-            {!isSidebarLoading && conversations.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-                <div className="w-16 h-16 bg-gradient-to-br from-blue-100/50 to-purple-100/50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-full flex items-center justify-center mb-4">
-                  <MessageSquare className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-                </div>
-                <h4 className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-1">No conversations yet</h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Start chatting with Nova to see your history here</p>
-              </div>
-            )}
-            
-            {conversations.map((convo) => (
-              <div
-                key={convo.id}
-                onClick={() => loadMessagesForSelectedConvo(convo.id)}
-                className={`group relative p-4 rounded-xl cursor-pointer transition-all duration-200 ${
-                  currentConversationId === convo.id 
-                    ? "bg-gradient-to-r from-blue-500/90 to-purple-500/90 text-white backdrop-blur-sm" 
-                    : "hover:bg-slate-100/30 dark:hover:bg-slate-800/30 hover:scale-[1.01]"
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className={`w-2 h-2 rounded-full mt-2 ${
-                    currentConversationId === convo.id ? "bg-white" : "bg-slate-300/50 dark:bg-slate-600/50"
-                  }`} />
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium line-clamp-2 ${
-                      currentConversationId === convo.id 
-                        ? "text-white" 
-                        : "text-slate-900 dark:text-slate-100"
-                    }`}>
-                      {convo.title}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Main Chat Area - Adjusted to take remaining space */}
-      <div className="flex flex-col flex-1 min-w-0 h-screen">
-        {/* Chat Header - Improved for mobile */}
-        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50 px-4 md:px-8 py-4 md:py-6 shadow-sm">
-          <div className="flex items-center justify-between max-w-4xl mx-auto">
-            <div className="flex items-center gap-3 md:gap-4">
-              <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
-                <Sparkles className="w-5 h-5 md:w-6 md:h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-lg md:text-xl font-bold text-slate-900 dark:text-slate-100 line-clamp-1">
-                  {currentConversationId && displayMessages.length > 0 
-                    ? conversations.find((c) => c.id === currentConversationId)?.title || "Chat with Nova"
-                    : "Chat with Nova"
-                  }
-                </h1>
-                <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400">AI Teaching Assistant</p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2 md:gap-3">
-              <Button 
-                onClick={toggleTTS} 
-                variant="outline" 
-                size="icon" 
-                className="h-9 w-9 md:h-11 md:w-11 rounded-xl bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:bg-white/80 dark:hover:bg-slate-800/80"
-              >
-                {isTTSEnabled ? (
-                  isSpeaking ? 
-                    <Volume2Icon className="h-4 w-4 md:h-5 md:w-5 text-blue-600 animate-pulse" /> : 
-                    <Volume2Icon className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
-                ) : (
-                  <VolumeXIcon className="h-4 w-4 md:h-5 md:w-5" />
+        
+        <ScrollArea className="flex-1 min-h-0">
+            <div className="p-2 space-y-1">
+                {(isSidebarLoading && conversations.length === 0) && (
+                    Array.from({ length: 7 }).map((_, i) => (
+                        <Skeleton key={i} className="h-9 w-full rounded bg-neutral-200 dark:bg-neutral-700" />
+                    ))
                 )}
-              </Button>
+                {(!isSidebarLoading && conversations.length === 0) && (
+                    <div className="text-center py-8 px-4">
+                        <MessageSquare className="mx-auto h-8 w-8 text-neutral-400 dark:text-neutral-500" />
+                        <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">No chats yet.</p>
+                    </div>
+                )}
+                {conversations.map((convo) => (
+                    <Button
+                        key={convo.id}
+                        variant="ghost"
+                        className={`w-full justify-start items-center h-auto py-2 px-3 text-sm truncate rounded-md transition-colors duration-150 text-left focus-visible:ring-1 focus-visible:ring-[${BRAND_ORANGE}]
+                            ${currentConversationId === convo.id 
+                            ? `bg-neutral-200 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-100 font-medium`
+                            : `text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700/70`
+                        }`}
+                        onClick={() => loadMessagesForSelectedConvo(convo.id)}
+                    >
+                       <MessageSquare className="h-4 w-4 mr-2.5 text-neutral-500 dark:text-neutral-400 flex-shrink-0" />
+                       <span className="truncate block flex-1">{convo.title || "Untitled Chat"}</span>
+                    </Button>
+                ))}
             </div>
+        </ScrollArea>
+        {/* Sidebar Footer - Optional, e.g. for settings or user profile */}
+        <div className="p-3 border-t border-neutral-200 dark:border-neutral-700/60 mt-auto flex-shrink-0">
+            <Button variant="ghost" className="w-full justify-start text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700/70 rounded-md">
+                <Settings2 className="h-4 w-4 mr-2.5 text-neutral-500 dark:text-neutral-400"/> Settings
+            </Button>
+        </div>
+      </div> {/* End Sidebar */}
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col max-h-screen overflow-hidden"> {/* Ensure main area also controls its overflow */}
+        {/* Chat Header - Minimal */}
+        <div className="h-16 flex-shrink-0 border-b border-neutral-200 dark:border-neutral-700/60 flex items-center px-6">
+          <div className="flex items-center gap-3 w-full">
+              <Button variant="ghost" size="icon" onClick={toggleSidebar} className="md:hidden h-9 w-9 text-neutral-500 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700 rounded-md" aria-label="Open sidebar">
+                  <MenuIcon className="h-5 w-5" />
+              </Button>
+              <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-200 truncate flex-1">
+                  {currentConversationId 
+                      ? conversations.find(c => c.id === currentConversationId)?.title || "Chat"
+                      : "AI Assistant"
+                  }
+              </h2>
+              <div className="flex items-center gap-2">
+                  <Button 
+                      variant={isTTSEnabled ? "subtle" : "outline"}
+                      style={isTTSEnabled ? { backgroundColor: `rgba(2, 46, 125, 0.1)`, color: BRAND_BLUE, borderColor: `rgba(2, 46, 125, 0.2)` } : {borderColor: "hsl(var(--border))"}}
+                      size="icon" 
+                      onClick={toggleTTS}
+                      className={`h-9 w-9 rounded-md tts-toggle-button transition-all text-neutral-500 dark:text-neutral-400 hover:border-neutral-400 dark:hover:border-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-200`}
+                      aria-label={isTTSEnabled ? "Disable Voice" : "Enable Voice"}
+                  >
+                      {isSpeaking ? <Volume2Icon className="h-4 w-4 animate-pulse" /> : (isTTSEnabled ? <Volume2Icon className="h-4 w-4" /> : <VolumeXIcon className="h-4 w-4" />)}
+                  </Button>
+              </div>
           </div>
         </div>
 
-        {/* Messages Area - Improved for mobile */}
-        <div className="flex-1 overflow-hidden">
-          <ScrollArea className="h-full" ref={scrollAreaRef}>
-            <div className="max-w-4xl mx-auto px-4 md:px-8 py-6 md:py-8">
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto">
+          <ScrollArea className="h-full" viewportRef={scrollAreaRef}>
+            <div className="max-w-3xl mx-auto p-4 sm:p-6 md:p-8 space-y-6">
               {isHistoryLoading && (
-                <div className="space-y-6">
+                <div className="space-y-5">
                   {Array.from({ length: 3 }).map((_, i) => (
-                    <div key={`skel-${i}`} className={`flex gap-4 ${i % 2 !== 0 ? 'justify-end' : ''}`}>
-                      {i % 2 === 0 && <Skeleton className="h-12 w-12 rounded-full flex-shrink-0" />}
-                      <div className={`space-y-2 max-w-md ${i % 2 !== 0 ? 'order-first' : ''}`}>
-                        <Skeleton className="h-4 w-full" />
-                        <Skeleton className="h-4 w-3/4" />
+                    <div key={i} className={`flex items-start gap-3 ${i % 2 !== 0 ? 'justify-end' : ''}`}>
+                      {i % 2 === 0 && <Skeleton className="h-9 w-9 rounded-full bg-neutral-200 dark:bg-neutral-700" />}
+                      <div className={`flex flex-col gap-1.5 items-start ${i % 2 !== 0 ? 'order-first items-end' : ''}`}>
+                        <Skeleton className="h-5 w-32 rounded bg-neutral-200 dark:bg-neutral-700" />
+                        <Skeleton className="h-5 w-48 rounded bg-neutral-200 dark:bg-neutral-700" />
                       </div>
-                      {i % 2 !== 0 && <Skeleton className="h-12 w-12 rounded-full flex-shrink-0" />}
+                      {i % 2 !== 0 && <Skeleton className="h-9 w-9 rounded-full bg-neutral-200 dark:bg-neutral-700" />}
                     </div>
                   ))}
                 </div>
               )}
 
               {!isHistoryLoading && displayMessages.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-full min-h-[300px] md:min-h-[400px] text-center px-4">
-                  <div className="w-20 h-20 md:w-24 md:h-24 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center mb-4 md:mb-6">
-                    <MessageSquare className="w-10 h-10 md:w-12 md:h-12 text-blue-600 dark:text-blue-400" />
+                <div className="flex flex-col items-center justify-center h-full min-h-[calc(100vh-300px)] text-center px-4 pt-10">
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-5 bg-[${BRAND_ORANGE}]/10`}>
+                    <MessageSquare className={`w-8 h-8 text-[${BRAND_ORANGE}]`} />
                   </div>
-                  <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2 md:mb-3">
-                    {currentConversationId ? "This conversation is empty" : "Welcome to Nova AI!"}
+                  <h2 className="text-xl font-semibold text-neutral-700 dark:text-neutral-200 mb-2">
+                    {currentConversationId ? "Empty Conversation" : "How can I help you today?"}
                   </h2>
-                  <p className="text-sm md:text-base text-slate-600 dark:text-slate-400 max-w-md leading-relaxed">
-                    {currentConversationId 
-                      ? "Send a message to continue this conversation."
-                      : "Your AI teaching assistant is ready to help. Ask questions, get explanations, or start learning something new!"
-                    }
-                  </p>
+                  {/* Suggestion chips - example */}
+                  {!currentConversationId && (
+                    <div className="mt-4 flex flex-wrap justify-center gap-2">
+                        {["Explain quantum computing", "Recipe for banana bread", "Debug my Python code"].map(prompt => (
+                            <Button key={prompt} variant="outline" size="sm" className="bg-white dark:bg-neutral-800 border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700" onClick={() => setInput(prompt)}>
+                                {prompt}
+                            </Button>
+                        ))}
+                    </div>
+                  )}
                 </div>
               )}
 
               {!isHistoryLoading && displayMessages.map((msg) => (
-                <div
-                  key={msg.id}
-                  className={`flex gap-3 md:gap-4 mb-6 md:mb-8 ${msg.role === "user" ? "justify-end" : ""}`}
-                >
+                <div key={msg.id} className={`flex gap-3 mb-5 ${msg.role === "user" ? "justify-end" : "items-start"}`}>
                   {msg.role !== "user" && (
-                    <Avatar className="h-10 w-10 md:h-12 md:w-12 flex-shrink-0 shadow-lg ring-2 ring-white dark:ring-slate-800">
+                    <Avatar className="h-8 w-8 md:h-9 md:w-9 flex-shrink-0 shadow-sm">
                       <AvatarImage src="/nova-avatar.png" alt="Nova" />
-                      <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-500 text-white font-semibold">
-                        N
-                      </AvatarFallback>
+                      <AvatarFallback className={`bg-[${BRAND_ORANGE}] text-white font-medium text-sm`}>N</AvatarFallback>
                     </Avatar>
                   )}
-                  
-                  <div className={`group relative max-w-[85%] md:max-w-[70%] ${msg.role === "user" ? "order-first" : ""}`}>
-                    <div className={`px-4 md:px-6 py-3 md:py-4 rounded-2xl shadow-lg transition-all duration-200 ${
-                      msg.role === "user" 
-                        ? "bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-br-md" 
-                        : "bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 border border-slate-200/50 dark:border-slate-700/50 rounded-bl-md"
-                    }`}>
+                  <div className={`group relative max-w-[85%] md:max-w-[75%] ${msg.role === "user" ? "order-first" : ""}`}>
+                    <div className={`px-3.5 py-2.5 rounded-lg shadow-sm 
+                      ${ msg.role === "user" 
+                          ? `bg-[${BRAND_BLUE}] text-white rounded-br-sm` 
+                          : "bg-white dark:bg-neutral-700 text-neutral-800 dark:text-neutral-100 border border-neutral-200 dark:border-neutral-600/50 rounded-bl-sm"
+                      }`}>
                       {msg.role === "assistant" && messages[messages.length - 1]?.id === msg.id && !chatIsLoading && reload && (
                         <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="absolute -top-2 -right-2 h-7 w-7 md:h-8 md:w-8 opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-slate-800 border shadow-lg rounded-full" 
-                          onClick={() => reload()}
-                        >
-                          <UpdateIcon className="h-3 w-3 md:h-4 md:w-4" />
+                          variant="ghost" size="icon" 
+                          className="absolute -top-2 -right-2 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity bg-neutral-100/70 dark:bg-neutral-600/70 backdrop-blur-sm border border-neutral-300 dark:border-neutral-500 shadow-md rounded-full hover:bg-neutral-200 dark:hover:bg-neutral-500" 
+                          onClick={() => reload()} aria-label="Reload response">
+                          <UpdateIcon className="h-3 w-3 text-neutral-500 dark:text-neutral-300" />
                         </Button>
                       )}
-                      
                       <ChatMessageContentRenderer content={msg.content} />
-                      
                       {msg.createdAt && (
-                        <p className={`text-[10px] md:text-xs mt-2 md:mt-3 ${
-                          msg.role === "user" 
-                            ? "text-white/70 text-right" 
-                            : "text-slate-500 dark:text-slate-400"
-                        }`}>
-                          {isToday(msg.createdAt) 
-                            ? format(msg.createdAt, "p") 
-                            : isYesterday(msg.createdAt) 
-                              ? `Yesterday ${format(msg.createdAt, "p")}` 
-                              : format(msg.createdAt, "MMM d, p")
-                          }
+                        <p className={`text-xs mt-2 opacity-60 ${msg.role === "user" ? "text-neutral-300 text-right" : "text-neutral-500 dark:text-neutral-400"}`}>
+                          {format(msg.createdAt, "p")}
                         </p>
                       )}
                     </div>
                   </div>
-                  
                   {msg.role === "user" && (
-                    <Avatar className="h-10 w-10 md:h-12 md:w-12 flex-shrink-0 shadow-lg ring-2 ring-white dark:ring-slate-800">
-                      <AvatarFallback className="bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold">
-                        U
-                      </AvatarFallback>
+                    <Avatar className="h-8 w-8 md:h-9 md:w-9 flex-shrink-0 shadow-sm">
+                      <AvatarFallback className="bg-neutral-200 dark:bg-neutral-600 text-neutral-600 dark:text-neutral-300 font-medium text-sm">U</AvatarFallback>
                     </Avatar>
                   )}
                 </div>
               ))}
 
               {chatIsLoading && messages[messages.length - 1]?.role === 'user' && (
-                <div className="flex gap-3 md:gap-4 mb-6 md:mb-8">
-                  <Avatar className="h-10 w-10 md:h-12 md:w-12 flex-shrink-0 shadow-lg ring-2 ring-white dark:ring-slate-800">
+                <div className="flex items-start gap-3 mb-5">
+                  <Avatar className="h-8 w-8 md:h-9 md:w-9 flex-shrink-0 shadow-sm">
                     <AvatarImage src="/nova-avatar.png" alt="Nova" />
-                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-500 text-white font-semibold">
-                      N
-                    </AvatarFallback>
+                    <AvatarFallback className={`bg-[${BRAND_ORANGE}] text-white font-medium text-sm`}>N</AvatarFallback>
                   </Avatar>
-                  <div className="max-w-[85%] md:max-w-[70%] px-4 md:px-6 py-3 md:py-4 rounded-2xl rounded-bl-md bg-white dark:bg-slate-800 border border-slate-200/50 dark:border-slate-700/50 shadow-lg">
-                    <div className="flex items-center gap-2 md:gap-3">
+                  <div className="max-w-[85%] md:max-w-[75%] px-3.5 py-2.5 rounded-lg bg-white dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600/50 shadow-sm">
+                    <div className="flex items-center gap-2">
                       <div className="flex gap-1">
-                        <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-blue-500 rounded-full animate-bounce" />
-                        <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
-                        <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
+                        <div className={`w-1.5 h-1.5 bg-[${BRAND_ORANGE}]/50 rounded-full animate-bounce`} style={{ animationDelay: "0s" }} />
+                        <div className={`w-1.5 h-1.5 bg-[${BRAND_ORANGE}]/70 rounded-full animate-bounce`} style={{ animationDelay: "0.1s" }} />
+                        <div className={`w-1.5 h-1.5 bg-[${BRAND_ORANGE}] rounded-full animate-bounce`} style={{ animationDelay: "0.2s" }} />
                       </div>
-                      <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400">Nova is thinking...</p>
+                      <p className="text-sm text-neutral-600 dark:text-neutral-300">Thinking...</p>
                     </div>
                   </div>
                 </div>
@@ -764,76 +500,61 @@ export default function ChatInterface() {
           </ScrollArea>
         </div>
 
-        {/* Input Area - Improved for mobile */}
-        <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-t border-slate-200/50 dark:border-slate-700/50 p-4 md:p-8">
-          <form onSubmit={customSubmit} className="max-w-4xl mx-auto">
+        {/* Input Area - Styled like ChatGPT/Gemini */}
+        <div className="flex-shrink-0 border-t border-neutral-200 dark:border-neutral-700/60 bg-white dark:bg-neutral-800/50 pt-3 pb-4 sm:pt-4 sm:pb-5 px-4">
+          <form onSubmit={customSubmit} className="max-w-3xl mx-auto">
             {error && (
-              <div className="mb-4 p-3 md:p-4 text-xs md:text-sm text-red-700 bg-red-50 dark:bg-red-900/20 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-xl">
-                <p>Error: {error.message}</p>
+              <div className="mb-2 p-2.5 text-sm text-red-700 bg-red-100 dark:bg-red-900/30 dark:text-red-400 border border-red-300 dark:border-red-600 rounded-md">
+                <p>{error.message}</p>
               </div>
             )}
-            
-            <div className="flex items-end gap-2 md:gap-4">
-              <div className="flex-1 relative">
-                <Textarea
-                  value={input}
-                  onChange={handleInputChange}
-                  placeholder={isListening ? "Listening..." : "Ask Nova anything..."}
-                  className="min-h-[50px] md:min-h-[60px] max-h-32 resize-none rounded-2xl bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 focus:border-blue-500/50 dark:focus:border-blue-400/50 px-4 md:px-6 py-3 md:py-4 pr-12 md:pr-16 text-sm md:text-base shadow-lg transition-all duration-200"
-                  rows={1}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      if (!chatIsLoading && input.trim()) {
-                        const form = e.currentTarget.form;
-                        if (form) {
-                          const formEvent = new Event('submit') as unknown as React.FormEvent<HTMLFormElement>;
-                          formEvent.preventDefault = () => {};
-                          customSubmit(formEvent);
-                        }
+            <div className="relative flex items-end p-0.5 border border-neutral-300 dark:border-neutral-600 rounded-xl shadow-sm focus-within:ring-2 focus-within:ring-[${BRAND_ORANGE}] focus-within:border-[${BRAND_ORANGE}] bg-white dark:bg-neutral-700">
+              <Textarea
+                ref={inputRef}
+                value={input}
+                onChange={handleInputChange}
+                placeholder={isListening ? "Listening..." : "Message AI Assistant..."}
+                className="flex-1 min-h-[44px] max-h-48 resize-none border-none focus:ring-0 shadow-none bg-transparent p-3 text-base placeholder:text-neutral-500 dark:placeholder:text-neutral-400 chat-input-textarea"
+                rows={1}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!chatIsLoading && input.trim()) {
+                      const form = e.currentTarget.form;
+                      if (form) {
+                         const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
+                         form.dispatchEvent(submitEvent);
                       }
                     }
-                  }}
-                  disabled={chatIsLoading || isHistoryLoading || isListening}
-                />
-                {input.length > 0 && (
-                  <span className="absolute right-4 md:right-6 bottom-3 md:bottom-4 text-[10px] md:text-xs text-slate-400 bg-white/80 dark:bg-slate-800/80 px-1.5 md:px-2 py-0.5 md:py-1 rounded-md">
-                    {input.length}
-                  </span>
-                )}
-              </div>
-              
-              <div className="flex gap-2 md:gap-3">
-                <Button
-                  type="button"
-                  onClick={toggleVoiceInput}
-                  variant={isListening ? "default" : "outline"}
-                  size="icon"
-                  className="h-[50px] w-[50px] md:h-[60px] md:w-[60px] rounded-2xl shadow-lg bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 hover:bg-white dark:hover:bg-slate-800 transition-all duration-200"
-                  disabled={chatIsLoading || isHistoryLoading}
-                >
-                  {isListening ? <MicOffIcon className="h-5 w-5 md:h-6 md:w-6" /> : <MicIcon className="h-5 w-5 md:h-6 md:w-6" />}
+                  }
+                }}
+                disabled={chatIsLoading || isHistoryLoading || isListening}
+              />
+              <div className="flex items-center p-1.5">
+                <Button 
+                    variant="ghost" size="icon" onClick={toggleVoiceInput}
+                    className={`h-9 w-9 rounded-lg text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-600 voice-input-button
+                               ${isListening ? `text-[${BRAND_ORANGE}] dark:text-[${BRAND_ORANGE}] bg-neutral-100 dark:bg-neutral-600` : ''}`}
+                    type="button" aria-label={isListening ? "Stop Listening" : "Start Voice Input"}
+                    disabled={chatIsLoading || isHistoryLoading}>
+                    {isListening ? <MicOffIcon className="h-5 w-5" /> : <MicIcon className="h-5 w-5" />}
                 </Button>
-                
                 <Button
                   type="submit"
-                  size="lg"
                   disabled={chatIsLoading || isHistoryLoading || !input.trim() || isListening}
-                  className="h-[50px] w-[50px] md:h-[60px] md:w-[60px] rounded-2xl bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 shadow-lg transition-all duration-200"
-                >
-                  <PaperPlaneIcon className="h-5 w-5 md:h-6 md:w-6" />
+                  className={`ml-1.5 h-9 w-9 rounded-lg bg-[${BRAND_ORANGE}] hover:bg-orange-500 text-white send-message-button
+                              disabled:bg-neutral-200 dark:disabled:bg-neutral-600 disabled:text-neutral-400 dark:disabled:text-neutral-500 disabled:cursor-not-allowed`}
+                  aria-label="Send Message" size="icon">
+                  <PaperPlaneIcon className="h-4.5 w-4.5" />
                 </Button>
               </div>
             </div>
-            
-            <div className="flex items-center justify-between mt-3 md:mt-4 text-[10px] md:text-xs text-slate-500 dark:text-slate-400 px-2">
-              <span className="hidden sm:inline">Press Enter to send • Shift + Enter for new line</span>
-              <span className="sm:hidden">Enter to send</span>
-              <span>LearnBridgEdu AI</span>
-            </div>
+            <p className="mt-2 text-xs text-center text-neutral-500 dark:text-neutral-400">
+              AI can make mistakes. Consider checking important information.
+            </p>
           </form>
-        </div>
-      </div>
-    </div>
+        </div> {/* End Input Area */}
+      </div> {/* End Main Chat Area Flex Container */}
+    </div> // End Root Div
   );
 }

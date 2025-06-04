@@ -1,0 +1,544 @@
+// src/app/essay-helper/page.tsx
+"use client";
+
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator"; // npx shadcn-ui@latest add separator
+import { toast } from "sonner";
+import { Loader2, Wand2 } from "lucide-react"; // Wand2 for "generate"
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Joyride, { CallBackProps, STATUS, Step } from "react-joyride";
+
+// Server actions
+import { brainstormEssayIdeasAction, generateEssayOutlineAction, getParagraphFeedbackAction } from "@/app/actions/essayActions";
+import { markTourAsCompletedAction } from "@/app/actions/userSettingsActions";
+
+interface BrainstormPoint {
+  id: string;
+  text: string;
+}
+
+interface OutlineSection {
+  id: string;
+  title: string;
+  points: string[];
+}
+
+interface FeedbackPointForServer {
+  id?: string;
+  area: string;
+  comment: string;
+  original_text_segment?: string;
+  suggested_revision?: string;
+}
+
+interface FeedbackPoint {
+  id: string;
+  area: string;
+  comment: string;
+  original_text_segment?: string;
+  suggested_revision?: string;
+  applies_to_selection?: boolean;
+}
+
+// Expanded Feedback Types
+const feedbackCategories = [
+  { id: "overall_clarity", label: "Overall Clarity & Conciseness" },
+  { id: "grammar_spelling", label: "Grammar & Spelling" },
+  { id: "argument_strength", label: "Argument Strength & Support" },
+  { id: "style_tone", label: "Style & Tone Consistency" },
+  { id: "flow_cohesion", label: "Flow & Cohesion (Transitions)" },
+  { id: "word_choice", label: "Word Choice & Vocabulary" },
+  { id: "sentence_structure", label: "Sentence Structure & Variety" },
+  { id: "passive_voice", label: "Passive Voice Usage" },
+  // { id: "thesis_connection", label: "Connection to Thesis (if thesis provided)" }, // Requires thesis input
+];
+
+export default function EssayHelperPage() {
+  const [essayTopic, setEssayTopic] = useState("");
+  const [keyPoints, setKeyPoints] = useState(""); // Optional user input
+  const [essayType, setEssayType] = useState(""); // Optional: persuasive, informative
+
+  const [brainstormedIdeas, setBrainstormedIdeas] = useState<string[]>([]);
+  const [generatedOutline, setGeneratedOutline] = useState<OutlineSection[]>([]);
+
+  const [isBrainstorming, setIsBrainstorming] = useState(false);
+  const [isOutlining, setIsOutlining] = useState(false);
+
+  // Paragraph feedback state
+  const [paragraphText, setParagraphText] = useState("");
+  const paragraphTextareaRef = useRef<HTMLTextAreaElement>(null); // Ref for the main textarea
+  const [userSelectedSnippet, setUserSelectedSnippet] = useState(""); // State to store user's highlighted text
+  const [selectedFeedbackTypes, setSelectedFeedbackTypes] = useState<string[]>(["overall_clarity", "grammar_spelling"]);
+  const [feedbackResults, setFeedbackResults] = useState<FeedbackPoint[]>([]);
+  const [isGettingFeedback, setIsGettingFeedback] = useState(false);
+  
+  // Joyride tour state
+  const [runTour, setRunTour] = useState(false);
+  const [tourSteps] = useState<Step[]>([
+    {
+      target: ".essay-helper-tabs",
+      content: "Welcome to Nova's Essay Helper! This tool has three main features to help with your essays.",
+      disableBeacon: true,
+      placement: "center"
+    },
+    {
+      target: ".brainstorm-section",
+      content: "Start by brainstorming ideas for your essay topic. Just enter your essay topic and Nova will generate creative ideas.",
+      placement: "bottom"
+    },
+    {
+      target: ".outline-section",
+      content: "Once you have ideas, create a structured outline for your essay with sections and key points.",
+      placement: "bottom"
+    },
+    {
+      target: ".paragraph-section",
+      content: "Get detailed feedback on individual paragraphs. You can even highlight specific text for focused feedback!",
+      placement: "top"
+    },
+    {
+      target: ".paragraph-textarea",
+      content: "Paste your paragraph here and highlight any text you want specific feedback on.",
+      placement: "top"
+    },
+    {
+      target: ".feedback-categories",
+      content: "Select the types of feedback you want Nova to focus on.",
+      placement: "bottom"
+    },
+    {
+      target: ".get-feedback-button",
+      content: "Click here to get AI-powered feedback on your writing!",
+      placement: "right"
+    }
+  ]);
+
+  const handleTourCallback = async (data: CallBackProps) => {
+    const { status } = data;
+    if (status === STATUS.FINISHED) {
+      await markTourAsCompletedAction({
+        tourKey: "essay_helper"
+      });
+    }
+  };
+
+  // Logic for capturing text selection
+  const handleTextSelection = useCallback(() => {
+    if (paragraphTextareaRef.current) {
+      const textarea = paragraphTextareaRef.current;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      if (start !== end) { // If there's an actual selection
+        const selectedText = textarea.value.substring(start, end);
+        setUserSelectedSnippet(selectedText);
+      }
+    }
+  }, []);
+
+  // Check for first-time visit and trigger tour
+  useEffect(() => {
+    // Logic to check if this is the first visit
+    // For now, we'll just set it to true for testing
+    setRunTour(true);
+  }, []);
+
+  // Update selection when user selects text in the textarea
+  useEffect(() => {
+    const textarea = paragraphTextareaRef.current;
+    if (textarea) {
+      textarea.addEventListener('mouseup', handleTextSelection);
+      textarea.addEventListener('keyup', handleTextSelection);
+      
+      return () => {
+        textarea.removeEventListener('mouseup', handleTextSelection);
+        textarea.removeEventListener('keyup', handleTextSelection);
+      };
+    }
+  }, [handleTextSelection]);
+
+  const handleBrainstorm = async () => {
+    if (!essayTopic.trim()) {
+      toast.error("Please enter an essay topic to brainstorm ideas.");
+      return;
+    }
+    setIsBrainstorming(true);
+    setBrainstormedIdeas([]);
+    try {
+      const result = await brainstormEssayIdeasAction(essayTopic, keyPoints, essayType);
+      if (result.success && result.ideas) {
+        setBrainstormedIdeas(result.ideas);
+        toast.success("Brainstorming complete!");
+      } else {
+        toast.error("Brainstorming Failed", { description: result.error });
+      }
+    } catch (error: any) {
+      toast.error("Brainstorming Error", { description: error.message });
+    } finally {
+      setIsBrainstorming(false);
+    }
+  };
+
+  const handleGenerateOutline = async () => {
+    if (!essayTopic.trim()) {
+      toast.error("Please enter an essay topic to generate an outline.");
+      return;
+    }
+    setIsOutlining(true);
+    setGeneratedOutline([]);
+    try {
+      // Use brainstormed ideas as part of the context for the outline if available
+      const contextForOutline = brainstormedIdeas.length > 0
+        ? `Consider these brainstormed points: ${brainstormedIdeas.join("; ")}`
+        : keyPoints;
+
+      const result = await generateEssayOutlineAction(essayTopic, contextForOutline, essayType);
+      if (result.success && result.outline) {
+        setGeneratedOutline(result.outline);
+        toast.success("Outline generated!");
+      } else {
+        toast.error("Outline Generation Failed", { description: result.error });
+      }
+    } catch (error: any) {
+      toast.error("Outline Generation Error", { description: error.message });
+    } finally {
+      setIsOutlining(false);
+    }
+  };
+
+  const handleFeedbackTypeChange = (typeId: string) => {
+    setSelectedFeedbackTypes(prev =>
+      prev.includes(typeId) ? prev.filter(id => id !== typeId) : [...prev, typeId]
+    );
+  };
+
+  const handleGetParagraphFeedback = async () => {
+    if (!paragraphText.trim()) {
+      toast.error("Please paste a paragraph to get feedback.");
+      return;
+    }
+    if (selectedFeedbackTypes.length === 0) {
+      toast.error("Please select at least one type of feedback to receive.");
+      return;
+    }
+
+    // Use the already captured userSelectedSnippet
+    // This is more reliable than getting it at button click time in case the user clicked elsewhere
+    const currentSnippet = userSelectedSnippet;
+    
+    // If currentSnippet is empty, it means either nothing was selected,
+    // or we want to give feedback on the whole paragraph for selected types.
+    // The server action will handle an empty selectedTextSnippet appropriately.
+
+    setIsGettingFeedback(true);
+    setFeedbackResults([]);
+    try {
+      const result = await getParagraphFeedbackAction(
+        paragraphText,
+        selectedFeedbackTypes,
+        currentSnippet, // Pass the captured snippet
+        essayTopic,
+        essayType
+      );
+
+      if (result.success && result.feedback) {
+        const structuredFeedback: FeedbackPoint[] = (result.feedback as FeedbackPointForServer[]).map((fb, i) => ({
+            id: fb.id || `fb-${Date.now()}-${i}`,
+            area: fb.area,
+            comment: fb.comment,
+            original_text_segment: fb.original_text_segment,
+            suggested_revision: fb.suggested_revision,
+            // Determine if feedback applies to selection based on AI's response
+            // The AI is prompted to indicate this in its comment or by using original_text_segment.
+            applies_to_selection: !!(currentSnippet && fb.original_text_segment && 
+              (currentSnippet.includes(fb.original_text_segment) || 
+               fb.original_text_segment.includes(currentSnippet))) || 
+              (fb.comment.toLowerCase().includes("your selection") || 
+               fb.comment.toLowerCase().includes("highlighted text"))
+        }));
+        setFeedbackResults(structuredFeedback);
+        toast.success("Feedback received!");
+      } else {
+        toast.error("Feedback Generation Failed", { description: result.error });
+      }
+    } catch (error: any) { 
+      toast.error("Feedback Error", { description: error.message }); 
+    } finally { 
+      setIsGettingFeedback(false); 
+    }
+  };
+
+  return (
+    <div className="container max-w-5xl mx-auto py-8 px-4 md:px-8">
+      {/* Joyride Tour */}
+      <Joyride
+        callback={handleTourCallback}
+        continuous
+        hideCloseButton
+        run={runTour}
+        scrollToFirstStep
+        showProgress
+        showSkipButton
+        steps={tourSteps}
+        styles={{
+          options: {
+            zIndex: 10000,
+            primaryColor: '#3b82f6',
+            backgroundColor: '#ffffff',
+            textColor: '#1e293b'
+          }
+        }}
+      />
+      
+      <Card className="shadow-md border-slate-200/60 dark:border-slate-700/60 overflow-hidden">
+        <CardHeader className="pb-4 pt-6 px-6">
+          <CardTitle className="text-2xl md:text-3xl font-bold text-center text-slate-900 dark:text-slate-100">Nova's Essay Helper</CardTitle>
+          <CardDescription className="text-center text-slate-500 dark:text-slate-400 mt-2">
+            Get AI assistance with brainstorming ideas, creating outlines, and improving your paragraphs
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="px-0 pb-0">
+          <Tabs defaultValue="paragraph-feedback" className="w-full essay-helper-tabs">
+            <TabsList className="grid w-full grid-cols-2 rounded-none border-b border-slate-200/60 dark:border-slate-700/60 bg-transparent p-0">
+              <TabsTrigger
+                value="brainstorm-outline"
+                className="rounded-none data-[state=active]:border-b-2 data-[state=active]:border-blue-500 data-[state=active]:shadow-none py-3 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400"
+              >
+                Brainstorm & Outline
+              </TabsTrigger>
+              <TabsTrigger
+                value="paragraph-feedback"
+                className="rounded-none data-[state=active]:border-b-2 data-[state=active]:border-blue-500 data-[state=active]:shadow-none py-3 data-[state=active]:bg-transparent data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400"
+              >
+                Paragraph Feedback
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Brainstorm & Outline Tab Content */}
+            <TabsContent value="brainstorm-outline" className="space-y-6">
+              <section className="space-y-6 p-4 md:p-6 rounded-xl bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50 brainstorm-section">
+                <h3 className="text-lg md:text-xl font-semibold text-slate-900 dark:text-slate-100">1. Tell Nova About Your Essay</h3>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="essayTopic" className="text-sm md:text-base font-medium text-slate-700 dark:text-slate-300">
+                      Essay Topic / Prompt <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="essayTopic"
+                      value={essayTopic}
+                      onChange={(e) => setEssayTopic(e.target.value)}
+                      placeholder="e.g., The Impact of Social Media on Teenagers"
+                      className="mt-2 text-sm md:text-base bg-white/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-700/50"
+                      disabled={isBrainstorming || isOutlining}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="keyPoints" className="text-sm md:text-base font-medium text-slate-700 dark:text-slate-300">
+                      Optional: Key Points / Themes to Include
+                    </Label>
+                    <Textarea
+                      id="keyPoints"
+                      value={keyPoints}
+                      onChange={(e) => setKeyPoints(e.target.value)}
+                      placeholder="e.g., Mental health, cyberbullying, positive connections, information spread..."
+                      className="mt-2 min-h-[100px] text-sm md:text-base resize-none bg-white/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-700/50"
+                      disabled={isBrainstorming || isOutlining}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="essayType" className="text-sm md:text-base font-medium text-slate-700 dark:text-slate-300">
+                      Optional: Type of Essay
+                    </Label>
+                    <Input
+                      id="essayType"
+                      value={essayType}
+                      onChange={(e) => setEssayType(e.target.value)}
+                      placeholder="e.g., Persuasive, Informative, Argumentative, Narrative"
+                      className="mt-2 text-sm md:text-base bg-white/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-700/50"
+                      disabled={isBrainstorming || isOutlining}
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <section className="space-y-6 outline-section">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <Button
+                    onClick={handleBrainstorm}
+                    disabled={isBrainstorming || isOutlining || !essayTopic.trim()}
+                    className="flex-1 h-11 text-sm md:text-base bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                  >
+                    {isBrainstorming ? (
+                      <Loader2 className="mr-2 h-4 w-4 md:h-5 md:w-5 animate-spin" />
+                    ) : (
+                      <Wand2 className="mr-2 h-4 w-4 md:h-5 md:w-5" />
+                    )}
+                    Brainstorm Ideas
+                  </Button>
+                  <Button
+                    onClick={handleGenerateOutline}
+                    disabled={isBrainstorming || isOutlining || !essayTopic.trim()}
+                    className="flex-1 h-11 text-sm md:text-base bg-white/50 dark:bg-slate-800/50 hover:bg-white dark:hover:bg-slate-800 border-slate-200/50 dark:border-slate-700/50"
+                    variant="outline"
+                  >
+                    {isOutlining ? (
+                      <Loader2 className="mr-2 h-4 w-4 md:h-5 md:w-5 animate-spin" />
+                    ) : (
+                      <Wand2 className="mr-2 h-4 w-4 md:h-5 md:w-5" />
+                    )}
+                    Generate Outline
+                  </Button>
+                </div>
+
+                {/* Brainstormed Ideas Output */}
+                {brainstormedIdeas.length > 0 && !isBrainstorming && (
+                  <div className="pt-6">
+                    <Separator className="my-4" />
+                    <h3 className="text-lg md:text-xl font-semibold mb-3 text-slate-900 dark:text-slate-100">Brainstormed Ideas</h3>
+                    <ul className="space-y-2 pl-4 bg-slate-50/50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
+                      {brainstormedIdeas.map((idea, index) => (
+                        <li key={index} className="text-sm md:text-base text-slate-700 dark:text-slate-300 flex items-start gap-2">
+                          <span className="text-blue-600 dark:text-blue-400 mt-1.5">•</span>
+                          <span>{idea}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Generated Outline Output */}
+                {generatedOutline.length > 0 && !isOutlining && (
+                  <div className="pt-6">
+                    <Separator className="my-4" />
+                    <h3 className="text-lg md:text-xl font-semibold mb-3 text-slate-900 dark:text-slate-100">Generated Outline</h3>
+                    <div className="space-y-4 bg-slate-50/50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
+                      {generatedOutline.map((section) => (
+                        <div key={section.id} className="pl-2">
+                          <h4 className="text-base md:text-lg font-semibold text-slate-900 dark:text-slate-100">{section.title}</h4>
+                          <ul className="space-y-2 pl-6 mt-2">
+                            {section.points.map((point, pIndex) => (
+                              <li key={pIndex} className="text-sm md:text-base text-slate-700 dark:text-slate-300 flex items-start gap-2">
+                                <span className="text-blue-600 dark:text-blue-400 mt-1.5">•</span>
+                                <span>{point}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </section>
+            </TabsContent>
+
+            {/* Paragraph Feedback Tab Content */}
+            <TabsContent value="paragraph-feedback" className="space-y-6">
+              <section className="space-y-6 p-4 md:p-6 rounded-xl bg-slate-50/50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50 paragraph-section">
+                <h3 className="text-lg md:text-xl font-semibold text-slate-900 dark:text-slate-100">1. Get Feedback on Your Writing</h3>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="paragraphText" className="text-lg font-medium">Your Paragraph/Text <span className="text-red-500">*</span></Label>
+                    <Textarea
+                      id="paragraphText"
+                      ref={paragraphTextareaRef} // Assign ref
+                      value={paragraphText}
+                      onChange={(e) => setParagraphText(e.target.value)}
+                      onSelect={handleTextSelection} // Capture text selection
+                      placeholder="Paste your paragraph..."
+                      className="mt-2 min-h-[250px] text-base paragraph-textarea" // Increased min-height
+                      disabled={isGettingFeedback}
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Paste your paragraph below. To get focused feedback on a specific part, simply <strong>highlight that text</strong> before clicking "Get Feedback".
+                  </p>
+                  {userSelectedSnippet && (
+                    <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/40 rounded text-sm">
+                      <span className="font-medium text-blue-700 dark:text-blue-300">Selected for focused feedback:</span>
+                      <span className="ml-2 text-blue-600 dark:text-blue-200 italic">"{userSelectedSnippet.length > 60 ? userSelectedSnippet.substring(0, 60) + '...' : userSelectedSnippet}"</span>
+                    </div>
+                  )}
+                  <div className="mt-6 feedback-categories">
+                    <Label className="text-sm md:text-base font-medium text-slate-700 dark:text-slate-300 block mb-3">
+                      Feedback Focus Areas: <span className="text-red-500">*</span>
+                    </Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
+                      {feedbackCategories.map((type) => (
+                        <div key={type.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`feedback-${type.id}`}
+                            checked={selectedFeedbackTypes.includes(type.id)}
+                            onCheckedChange={() => handleFeedbackTypeChange(type.id)}
+                            disabled={isGettingFeedback}
+                            className="border-slate-200/50 dark:border-slate-700/50"
+                          />
+                          <Label htmlFor={`feedback-${type.id}`} className="text-sm font-normal cursor-pointer text-slate-700 dark:text-slate-300">
+                            {type.label}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <Button
+                    onClick={handleGetParagraphFeedback}
+                    disabled={isGettingFeedback || !paragraphText.trim() || selectedFeedbackTypes.length === 0}
+                    className="w-full sm:w-auto h-11 text-sm md:text-base bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 get-feedback-button"
+                  >
+                    {isGettingFeedback ? (
+                      <Loader2 className="mr-2 h-4 w-4 md:h-5 md:w-5 animate-spin" />
+                    ) : (
+                      <Wand2 className="mr-2 h-4 w-4 md:h-5 md:w-5" />
+                    )}
+                    Get Feedback
+                  </Button>
+                </div>
+              </section>
+
+              {/* Feedback Results Output */}
+              {feedbackResults.length > 0 && !isGettingFeedback && (
+                <section className="pt-6">
+                  <Separator className="my-4" />
+                  <h3 className="text-lg md:text-xl font-semibold mb-4 text-slate-900 dark:text-slate-100">Nova's Feedback & Suggestions</h3>
+                  <div className="space-y-4">
+                    {feedbackResults.map((fb) => (
+                      <Card key={fb.id} className={`shadow-sm ${fb.applies_to_selection ? 'border-blue-400/50 dark:border-blue-500/50 ring-1 ring-blue-400/30 dark:ring-blue-500/30' : 'border-slate-200/50 dark:border-slate-700/50'}`}>
+                        <CardHeader className="pb-2 pt-3 px-4">
+                           <CardTitle className="text-md font-semibold capitalize">
+                            {fb.area.replace(/_/g, ' ')}
+                            {fb.applies_to_selection && <span className="ml-2 text-xs font-normal text-blue-500 dark:text-blue-400">(on your selected text)</span>}
+                           </CardTitle>
+                        </CardHeader>
+                        <CardContent className="px-4 pb-3 text-sm space-y-2">
+                          {fb.original_text_segment && (
+                             <blockquote className="mt-1 mb-2 pl-3 italic border-l-2 border-slate-300/50 dark:border-slate-600/50 text-slate-600 dark:text-slate-400 text-xs">
+                                Regarding: "{fb.original_text_segment}"
+                            </blockquote>
+                          )}
+                          <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{fb.comment}</p>
+                          {fb.suggested_revision && (
+                            <div className="mt-2 p-3 bg-green-50/50 dark:bg-green-900/20 border border-green-200/50 dark:border-green-700/50 rounded-md">
+                                <p className="text-xs font-medium text-green-700 dark:text-green-400 mb-1">Suggestion:</p>
+                                <p className="text-sm text-green-800 dark:text-green-300 whitespace-pre-wrap font-medium">{fb.suggested_revision}</p>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </section>
+              )}
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+        <CardFooter className="text-xs text-slate-500 dark:text-slate-400 text-center border-t border-slate-200/50 dark:border-slate-700/50 bg-slate-50/30 dark:bg-slate-800/30">
+          <p>Nova's Essay Helper provides suggestions. Always review and use your own critical thinking.</p>
+        </CardFooter>
+      </Card>
+    </div>
+  );
+}

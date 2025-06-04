@@ -205,6 +205,60 @@ export async function changeUserPasswordAction(newPassword: string): Promise<Act
   return { success: true };
 }
 
+interface TourCompletionPayload {
+  tourKey: // Define specific tour keys as a union type for type safety
+    | "chat"
+    | "flashcards"
+    | "essay_helper"
+    | "photo_solver"
+    | "smart_notes"
+    | "quiz_generator"
+    | "learning_plan";
+}
+
+export async function markTourAsCompletedAction(
+  payload: TourCompletionPayload
+): Promise<ActionResult> {
+  const supabase = createSupabaseServerActionClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    return { success: false, error: "User not authenticated." };
+  }
+
+  const tourDbColumn = `tour_completed_${payload.tourKey}`;
+
+  // Validate if tourDbColumn is a valid column name to prevent SQL injection like issues
+  // (though here we control the input via TourCompletionPayload)
+  const validTourColumns = [
+    "tour_completed_chat", "tour_completed_flashcards", "tour_completed_essay_helper",
+    "tour_completed_photo_solver", "tour_completed_smart_notes", "tour_completed_quiz_generator",
+    "tour_completed_learning_plan"
+  ];
+  if (!validTourColumns.includes(tourDbColumn)) {
+    return { success: false, error: "Invalid tour key specified." };
+  }
+
+  const updates = {
+    [tourDbColumn]: true,
+    updated_at: new Date().toISOString(), // Also update the profile's updated_at
+  };
+
+  const { error } = await supabase
+    .from("profiles")
+    .update(updates)
+    .eq("id", user.id);
+
+  if (error) {
+    console.error(`Error marking tour ${payload.tourKey} as completed:`, error);
+    return { success: false, error: `Failed to update tour status: ${error.message}` };
+  }
+  
+  // Revalidate settings page if it ever displays these tour statuses
+  // revalidatePath("/settings"); 
+  return { success: true };
+}
+
 export async function uploadAvatarAction(
   formData: FormData
 ): Promise<ActionResult> {

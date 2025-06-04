@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, UserPlus } from "lucide-react";
+import { Loader2, UserPlus, Sparkles, Brain, Zap } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -64,86 +64,140 @@ export default function SignUpPage() {
   };
 
   return (
-    <div className="container relative h-screen flex-col items-center justify-center grid lg:max-w-none lg:grid-cols-2 lg:px-0">
-      <div className="relative hidden h-full flex-col bg-muted p-10 text-white lg:flex dark:border-r">
-        <div className="absolute inset-0 bg-gradient-to-br from-emerald-600 to-blue-700" />
-        <div className="relative z-20 flex items-center text-lg font-medium">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="mr-2 h-6 w-6"
-          >
-            <path d="m8 3 4 8 5-5v11H5V11l3-8Z" />
-          </svg>
+    <div className="relative min-h-screen flex-col items-center justify-center grid lg:max-w-none lg:grid-cols-2">
+      {/* Left Side - Brand Showcase */}
+      <div className="relative hidden h-full flex-col p-10 text-white lg:flex dark:border-r overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#022e7d] via-[#1e40af] to-[#fd6a3e]" />
+        
+        {/* Decorative Elements */}
+        <div className="absolute top-20 right-20 w-32 h-32 bg-white/10 rounded-full blur-xl"></div>
+        <div className="absolute bottom-40 left-10 w-24 h-24 bg-[#fd6a3e]/30 rounded-full blur-lg"></div>
+        <div className="absolute top-1/2 right-10 w-16 h-16 bg-white/20 rounded-full blur-md"></div>
+        
+        {/* Logo and Brand */}
+        <div className="relative z-20 flex items-center text-xl font-bold">
+          <div className="mr-3 p-2 bg-gradient-to-br from-[#fd6a3e] to-[#f97316] rounded-xl shadow-lg">
+            <Brain className="h-6 w-6 text-white" />
+          </div>
           CogniSpark AI
         </div>
+        
+        {/* Features */}
+        <div className="relative z-20 mt-16 space-y-8">
+          <div className="space-y-6">
+            <h2 className="text-3xl font-bold leading-tight">
+              Transform Your Learning with AI-Powered Flashcards
+            </h2>
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="p-2 bg-[#fd6a3e]/20 rounded-lg">
+                  <Sparkles className="h-5 w-5 text-[#fd6a3e]" />
+                </div>
+                <span className="text-lg">AI-Generated Content</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="p-2 bg-[#fd6a3e]/20 rounded-lg">
+                  <Brain className="h-5 w-5 text-[#fd6a3e]" />
+                </div>
+                <span className="text-lg">Smart Learning Algorithms</span>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="p-2 bg-[#fd6a3e]/20 rounded-lg">
+                  <Zap className="h-5 w-5 text-[#fd6a3e]" />
+                </div>
+                <span className="text-base">Instant Knowledge Retention</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Testimonial */}
         <div className="relative z-20 mt-auto">
-          <blockquote className="space-y-2">
-            <p className="text-lg">
-              &ldquo;Getting started was incredibly smooth. The platform&apos;s intuitive design made onboarding a breeze.&rdquo;
-            </p>
-            <footer className="text-sm">Alex Thompson</footer>
-          </blockquote>
+          <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
+            <blockquote className="space-y-4">
+              <p className="text-base leading-relaxed">
+                &ldquo;CogniSpark AI revolutionized my study routine. The AI-powered flashcards adapt to my learning pace, making complex topics easier to master. I've improved my retention by 300%!&rdquo;
+              </p>
+              <footer className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-[#fd6a3e] to-[#f97316] rounded-full flex items-center justify-center">
+                  <span className="text-sm font-bold text-white">PA</span>
+                </div>
+                <div>
+                  <div className="font-semibold">Princess Abbey</div>
+                  <div className="text-sm text-blue-200">Student, Ghana</div>
+                </div>
+              </footer>
+            </blockquote>
+          </div>
         </div>
       </div>
       
-      <div className="relative lg:p-8 flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-        <div className="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,#fff,rgba(255,255,255,0.6))] dark:bg-grid-slate-700/25 dark:[mask-image:linear-gradient(0deg,rgba(255,255,255,0.1),rgba(255,255,255,0.5))]" />
+      {/* Right Side - Signup Form */}
+      <div className="relative lg:p-8 flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-orange-50">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-40">
+          <div className="absolute top-20 left-20 w-72 h-72 bg-[#fd6a3e]/10 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-20 right-20 w-96 h-96 bg-[#022e7d]/10 rounded-full blur-3xl"></div>
+        </div>
         
-        <Card className="relative w-full max-w-md mx-4 shadow-2xl border-0 bg-white/95 backdrop-blur-sm dark:bg-slate-900/95">
-          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-blue-500/10 rounded-lg" />
-          <CardHeader className="relative space-y-4 pb-8">
-            <div className="flex justify-center mb-4">
-              <div className="p-3 rounded-full bg-gradient-to-r from-emerald-500 to-blue-600">
-                <UserPlus className="h-6 w-6 text-white" />
+        <Card className="relative w-full max-w-md mx-4 shadow-2xl border-0 bg-white/95 backdrop-blur-sm overflow-hidden">
+          {/* Card Glow Effect */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#fd6a3e]/5 to-[#022e7d]/5 rounded-2xl" />
+          
+          <CardHeader className="relative space-y-6 pb-8">
+            {/* Icon */}
+            <div className="flex justify-center mb-2">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-[#fd6a3e] to-[#f97316] shadow-lg">
+                <UserPlus className="h-8 w-8 text-white" />
               </div>
             </div>
-            <CardTitle className="text-3xl font-bold text-center bg-gradient-to-r from-slate-900 to-slate-700 dark:from-slate-100 dark:to-slate-300 bg-clip-text text-transparent">
-              Join CogniSpark AI
-            </CardTitle>
-            <CardDescription className="text-center text-slate-600 dark:text-slate-400 text-base">
-              Create your account and start your AI journey
-            </CardDescription>
+            
+            {/* Title */}
+            <div className="text-center space-y-3">
+              <CardTitle className="text-3xl font-bold bg-gradient-to-r from-[#022e7d] to-[#1e40af] bg-clip-text text-transparent">
+                Join CogniSpark AI
+              </CardTitle>
+              <CardDescription className="text-gray-600 text-base leading-relaxed">
+                Create your account and unlock the power of AI-driven learning
+              </CardDescription>
+            </div>
           </CardHeader>
           
           <CardContent className="relative space-y-6">
             {error && (
-              <Alert variant="destructive" className="border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
-                <AlertDescription className="text-red-700 dark:text-red-400">{error}</AlertDescription>
+              <Alert variant="destructive" className="border-red-200 bg-red-50/80 backdrop-blur-sm">
+                <AlertDescription className="text-red-700">{error}</AlertDescription>
               </Alert>
             )}
             
             <form onSubmit={handleSignUp} className="space-y-6">
-              <div className="space-y-4">
+              <div className="space-y-5">
+                {/* Full Name Field */}
                 <div className="space-y-2">
-                  <Label htmlFor="fullName" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  <Label htmlFor="fullName" className="text-sm font-semibold text-[#022e7d]">
                     Full Name
                   </Label>
-                  <div className="relative">
+                  <div className="relative group">
                     <Input
                       id="fullName"
                       type="text"
-                      placeholder="John Doe"
+                      placeholder="Enter your full name"
                       autoComplete="name"
                       disabled={loading}
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       required
-                      className="h-12 pl-4 text-base bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500 focus:ring-emerald-500/20 dark:bg-slate-800 dark:border-slate-700 dark:focus:border-emerald-400"
+                      className="h-12 pl-4 text-base bg-white/80 border-2 border-gray-200 focus:bg-white focus:border-[#fd6a3e] focus:ring-4 focus:ring-[#fd6a3e]/20 transition-all duration-300 rounded-xl group-hover:border-[#fd6a3e]/50"
                     />
                   </div>
                 </div>
                 
+                {/* Email Field */}
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  <Label htmlFor="email" className="text-sm font-semibold text-[#022e7d]">
                     Email Address
                   </Label>
-                  <div className="relative">
+                  <div className="relative group">
                     <Input
                       id="email"
                       placeholder="name@example.com"
@@ -155,59 +209,64 @@ export default function SignUpPage() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      className="h-12 pl-4 text-base bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500 focus:ring-emerald-500/20 dark:bg-slate-800 dark:border-slate-700 dark:focus:border-emerald-400"
+                      className="h-12 pl-4 text-base bg-white/80 border-2 border-gray-200 focus:bg-white focus:border-[#fd6a3e] focus:ring-4 focus:ring-[#fd6a3e]/20 transition-all duration-300 rounded-xl group-hover:border-[#fd6a3e]/50"
                     />
                   </div>
                 </div>
                 
+                {/* Password Field */}
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  <Label htmlFor="password" className="text-sm font-semibold text-[#022e7d]">
                     Password
                   </Label>
-                  <div className="relative">
+                  <div className="relative group">
                     <Input
                       id="password"
                       type="password"
-                      placeholder="••••••••"
+                      placeholder="Create a strong password"
                       autoComplete="new-password"
                       disabled={loading}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       minLength={6}
-                      className="h-12 pl-4 text-base bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500 focus:ring-emerald-500/20 dark:bg-slate-800 dark:border-slate-700 dark:focus:border-emerald-400"
+                      className="h-12 pl-4 text-base bg-white/80 border-2 border-gray-200 focus:bg-white focus:border-[#fd6a3e] focus:ring-4 focus:ring-[#fd6a3e]/20 transition-all duration-300 rounded-xl group-hover:border-[#fd6a3e]/50"
                     />
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-gray-500 pl-1">
                     Password must be at least 6 characters long
                   </p>
                 </div>
               </div>
               
+              {/* Submit Button */}
               <Button 
                 disabled={loading} 
                 type="submit" 
-                className="w-full h-12 text-base font-medium bg-gradient-to-r from-emerald-600 to-blue-600 hover:from-emerald-700 hover:to-blue-700 border-0 shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-[1.02]"
+                className="w-full h-12 text-base font-bold bg-gradient-to-r from-[#fd6a3e] to-[#f97316] hover:from-[#f97316] hover:to-[#fd6a3e] border-0 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] rounded-xl"
               >
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Creating Account...
+                    Creating Your Account...
                   </>
                 ) : (
-                  "Create Your Account"
+                  <>
+                    <Sparkles className="mr-2 h-5 w-5" />
+                    Create Your Account
+                  </>
                 )}
               </Button>
             </form>
           </CardContent>
           
-          <CardFooter className="relative pt-6">
+          <CardFooter className="relative pt-6 pb-8">
             <div className="w-full text-center">
-              <p className="text-slate-600 dark:text-slate-400">
+              <p className="text-gray-600">
                 Already have an account?{" "}
                 <Link
                   href="/login"
-                  className="font-semibold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300 transition-colors duration-200"
+                  className="font-bold text-[#fd6a3e] hover:text-[#f97316] transition-colors duration-200 hover:underline"
                 >
                   Sign in here
                 </Link>
@@ -215,6 +274,19 @@ export default function SignUpPage() {
             </div>
           </CardFooter>
         </Card>
+        
+        {/* Mobile Brand Info */}
+        <div className="lg:hidden absolute bottom-8 left-4 right-4">
+          <div className="text-center p-4 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/30">
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <div className="p-1 bg-gradient-to-br from-[#fd6a3e] to-[#f97316] rounded-lg">
+                <Brain className="h-4 w-4 text-white" />
+              </div>
+              <span className="font-bold text-[#022e7d]">CogniSpark AI</span>
+            </div>
+            <p className="text-xs text-gray-600">Transform your learning with AI-powered flashcards</p>
+          </div>
+        </div>
       </div>
     </div>
   );

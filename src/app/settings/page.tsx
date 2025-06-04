@@ -1,4 +1,3 @@
-// src/app/settings/page.tsx
 "use client";
 
 import { useState, useEffect, FormEvent, ChangeEvent, useRef } from "react";
@@ -143,23 +142,23 @@ export default function SettingsPage() {
 
         setUser(user);
 
-        const { data: profile } = await supabase
+        const { data: profileData } = await supabase // Renamed to avoid conflict with state variable
           .from('profiles')
           .select('*')
           .eq('id', user.id)
           .single();
 
-        if (profile) {
-          setProfile(profile);
+        if (profileData) {
+          setProfile(profileData);
           const profileFormData = {
-            full_name: profile.full_name || "",
-            date_of_birth: profile.date_of_birth || "",
-            grade_level: profile.grade_level || "",
-            subjects_of_interest: (profile.subjects_of_interest || []).map((subject: string) => ({ 
+            full_name: profileData.full_name || "",
+            date_of_birth: profileData.date_of_birth || "",
+            grade_level: profileData.grade_level || "",
+            subjects_of_interest: (profileData.subjects_of_interest || []).map((subject: string) => ({ 
               id: subject, 
               text: subject 
             })),
-            learning_goals: (profile.learning_goals || []).map((goal: string) => ({ 
+            learning_goals: (profileData.learning_goals || []).map((goal: string) => ({ 
               id: goal, 
               text: goal 
             }))
@@ -218,9 +217,11 @@ export default function SettingsPage() {
         learning_goals: formData.learning_goals.map(tag => tag.text)
       });
 
-      if (result.success) {
+      if (result.success && result.data) { // Ensure result.data is checked
         toast.success("Profile updated successfully!");
-        setProfile(result.data);
+        // Assuming result.data is the updated profile of type ProfileData
+        // If not, adjust this line or how you fetch/update profile state
+        setProfile(prev => prev ? { ...prev, ...result.data } : result.data as ProfileData);
         setOriginalFormData(formData);
         setHasUnsavedChanges(false);
       } else {
@@ -236,7 +237,7 @@ export default function SettingsPage() {
   const handlePasswordSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
-    if (!passwordData.new_password || !passwordData.confirm_password) {
+    if (!passwordData.current_password || !passwordData.new_password || !passwordData.confirm_password) {
       toast.error("Please fill in all password fields");
       return;
     }
@@ -246,24 +247,40 @@ export default function SettingsPage() {
       return;
     }
 
-    if (passwordData.new_password.length < 6) {
-      toast.error("Password must be at least 6 characters long");
-      return;
+    if (passwordData.new_password.length < 8 || checkPasswordStrength(passwordData.new_password) < 3) {
+        toast.error("Password is not strong enough. Please follow the guidelines.");
+        return;
     }
 
     setIsChangingPassword(true);
     try {
-      const result = await changeUserPasswordAction(passwordData.new_password);
+        // Note: Supabase's updateUser method is used for password change.
+        // It requires the user to be authenticated.
+        // The `changeUserPasswordAction` should handle this correctly with Supabase.
+        const supabase = createPagesBrowserClient();
+        const { error } = await supabase.auth.updateUser({ password: passwordData.new_password });
 
-      if (result.success) {
-        toast.success("Password changed successfully!");
+
+      if (!error) {
+        toast.success("Password changed successfully! You might be signed out and need to log in again.");
         setPasswordData({
           current_password: "",
           new_password: "",
           confirm_password: ""
         });
+        // Optionally, sign the user out or prompt them to re-login for security.
+        // await supabase.auth.signOut();
+        // router.push('/login');
       } else {
-        toast.error("Failed to change password", { description: result.error });
+        // More specific error handling based on Supabase errors
+        if (error.message.includes("same password") || error.message.includes("New password should be different")) {
+            toast.error("New password must be different from the old password.");
+        } else if (error.message.includes("weak password")) {
+             toast.error("The new password is too weak. Please choose a stronger one.");
+        }
+        else {
+            toast.error("Failed to change password", { description: error.message });
+        }
       }
     } catch (error: any) {
       toast.error("Error changing password", { description: error.message });
@@ -276,27 +293,25 @@ export default function SettingsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
     if (!file.type.startsWith('image/')) {
-      toast.error("Please select a valid image file");
+      toast.error("Please select a valid image file (JPEG, PNG, GIF).");
       return;
     }
 
-    // Validate file size (5MB limit)
     if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image size must be less than 5MB");
+      toast.error("Image size must be less than 5MB.");
       return;
     }
 
     setIsUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("avatar", file);
-      const result = await uploadAvatarAction(formData);
+      const formDataPayload = new FormData(); // Renamed to avoid conflict
+      formDataPayload.append("avatar", file);
+      const result = await uploadAvatarAction(formDataPayload);
       
-      if (result.success) {
+      if (result.success && result.data?.avatar_url) {
         toast.success("Profile picture updated!");
-        setProfile(prev => prev ? { ...prev, avatar_url: result.data.avatar_url } : null);
+        setProfile(prev => prev ? { ...prev, avatar_url: result.data.avatar_url } : { avatar_url: result.data.avatar_url } as ProfileData);
       } else {
         toast.error("Failed to upload profile picture", { description: result.error });
       }
@@ -304,7 +319,6 @@ export default function SettingsPage() {
       toast.error("Error uploading profile picture", { description: error.message });
     } finally {
       setIsUploading(false);
-      // Clear the file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -316,8 +330,9 @@ export default function SettingsPage() {
     try {
       const result = await deleteAccountAction();
       if (result.success) {
-        toast.success("Account deleted successfully");
-        router.push('/');
+        toast.success("Account deleted successfully. You will be redirected.");
+        await createPagesBrowserClient().auth.signOut(); // Ensure user is signed out
+        router.push('/'); 
       } else {
         toast.error("Failed to delete account", { description: result.error });
       }
@@ -330,7 +345,7 @@ export default function SettingsPage() {
 
   const getPasswordStrengthColor = (strength: number) => {
     if (strength <= 2) return "bg-red-500";
-    if (strength <= 3) return "bg-yellow-500";
+    if (strength <= 3) return "bg-yellow-500"; // Changed from amber for default tailwind
     return "bg-green-500";
   };
 
@@ -342,687 +357,375 @@ export default function SettingsPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto py-12 px-4">
-        <div className="max-w-5xl mx-auto">
-          <div className="mb-8">
-            <div className="h-10 bg-muted rounded w-1/4 mb-3 animate-pulse"></div>
-            <div className="h-5 bg-muted rounded w-1/2 animate-pulse"></div>
-          </div>
-          
-          {/* Skeleton tabs */}
-          <div className="flex mb-8 space-x-2 bg-muted/20 p-1 rounded-lg w-fit">
-            <div className="h-10 w-28 bg-muted rounded-md animate-pulse"></div>
-            <div className="h-10 w-28 bg-muted/50 rounded-md animate-pulse"></div>
-            <div className="h-10 w-28 bg-muted/50 rounded-md animate-pulse"></div>
-          </div>
-          
-          <Card className="border border-muted/30 shadow-sm">
-            <CardContent className="p-8">
-              <div className="animate-pulse space-y-8">
-                <div className="flex items-center gap-6">
-                  <div className="w-24 h-24 bg-muted rounded-full ring-4 ring-muted/30"></div>
-                  <div className="space-y-3">
-                    <div className="h-5 bg-muted rounded w-40"></div>
-                    <div className="h-4 bg-muted rounded w-56"></div>
-                    <div className="h-9 bg-muted rounded w-48"></div>
+      <div className="bg-gray-50 dark:bg-gray-950 min-h-screen">
+        <div className="container mx-auto py-12 px-4">
+          <div className="max-w-5xl mx-auto">
+            <div className="mb-8">
+              <div className="h-10 bg-gray-300 dark:bg-gray-700 rounded w-1/4 mb-3 animate-pulse"></div>
+              <div className="h-5 bg-gray-300 dark:bg-gray-700 rounded w-1/2 animate-pulse"></div>
+            </div>
+            
+            <div className="flex mb-8 space-x-2 bg-gray-200 dark:bg-gray-800/50 p-1 rounded-lg w-fit">
+              <div className="h-10 w-28 bg-gray-300 dark:bg-gray-700 rounded-md animate-pulse"></div>
+              <div className="h-10 w-28 bg-gray-400/50 dark:bg-gray-700/50 rounded-md animate-pulse"></div>
+              <div className="h-10 w-28 bg-gray-400/50 dark:bg-gray-700/50 rounded-md animate-pulse"></div>
+            </div>
+            
+            <Card className="border border-gray-200 dark:border-gray-700/50 shadow-sm bg-white dark:bg-gray-900">
+              <CardContent className="p-8">
+                <div className="animate-pulse space-y-8">
+                  <div className="flex items-center gap-6">
+                    <div className="w-24 h-24 bg-gray-300 dark:bg-gray-700 rounded-full ring-4 ring-gray-300/30 dark:ring-gray-700/30"></div>
+                    <div className="space-y-3">
+                      <div className="h-5 bg-gray-300 dark:bg-gray-700 rounded w-40"></div>
+                      <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-56"></div>
+                      <div className="h-9 bg-gray-300 dark:bg-gray-700 rounded w-48"></div>
+                    </div>
+                  </div>
+                  <div className="h-px w-full bg-gray-300/50 dark:bg-gray-700/50"></div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-24"></div>
+                      <div className="h-10 bg-gray-300 dark:bg-gray-700 rounded"></div>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="h-4 bg-gray-300 dark:bg-gray-700 rounded w-24"></div>
+                      <div className="h-10 bg-gray-300 dark:bg-gray-700 rounded"></div>
+                    </div>
                   </div>
                 </div>
-                <div className="h-px w-full bg-muted/50"></div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-3">
-                    <div className="h-4 bg-muted rounded w-24"></div>
-                    <div className="h-10 bg-muted rounded"></div>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="h-4 bg-muted rounded w-24"></div>
-                    <div className="h-10 bg-muted rounded"></div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto py-12 px-4 min-h-screen">
-      <div className="max-w-5xl mx-auto space-y-8">
-        {/* Header with gradient */}
-        <div className="space-y-3 relative pb-6">
-          <div className="absolute top-0 left-0 w-full h-40 bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl -z-10 blur-xl opacity-80"></div>
-          <div className="flex items-center gap-3">
-            <Settings className="h-8 w-8 text-primary" />
-            <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70">Settings</h1>
+    <div className="bg-gray-50 dark:bg-gray-950 min-h-screen">
+      <div className="container mx-auto py-12 px-4">
+        <div className="max-w-5xl mx-auto space-y-10">
+          {/* Header */}
+          <div className="space-y-3 relative pb-6">
+            <div className="absolute top-0 left-0 w-full h-40 bg-gradient-to-r from-[#fd6a3e]/5 to-[#fd6a3e]/10 rounded-xl -z-10 blur-2xl opacity-70"></div>
+            <div className="flex items-center gap-3">
+              <Settings className="h-9 w-9 text-[#fd6a3e]" />
+              <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-[#fd6a3e] to-[#e05c35]">Settings</h1>
+            </div>
+            <p className="text-gray-600 dark:text-gray-400 text-lg max-w-2xl">
+              Manage your account settings, preferences, and security options.
+            </p>
           </div>
-          <p className="text-muted-foreground text-lg max-w-2xl">
-            Manage your account settings, preferences, and security options.
-          </p>
-        </div>
-        
-        {/* Tabs Navigation */}
-        <Tabs defaultValue="profile" className="w-full" onValueChange={setActiveTab}>
+          
+          <Tabs defaultValue="profile" className="w-full" onValueChange={setActiveTab}>
+            <TabsList className="mb-8 grid grid-cols-3 md:w-fit bg-gray-100 dark:bg-gray-800/60 p-1 rounded-lg shadow-sm">
+              <TabsTrigger value="profile" className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=inactive]:text-[#022e7d] data-[state=inactive]:dark:text-sky-300 data-[state=inactive]:hover:bg-[#fd6a3e]/10 data-[state=inactive]:hover:text-[#fd6a3e] data-[state=active]:bg-[#fd6a3e] data-[state=active]:text-white data-[state=active]:shadow-md rounded-md transition-all duration-200">
+                <UserIcon className="h-4 w-4" />
+                <span>Profile</span>
+              </TabsTrigger>
+              <TabsTrigger value="password" className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=inactive]:text-[#022e7d] data-[state=inactive]:dark:text-sky-300 data-[state=inactive]:hover:bg-[#fd6a3e]/10 data-[state=inactive]:hover:text-[#fd6a3e] data-[state=active]:bg-[#fd6a3e] data-[state=active]:text-white data-[state=active]:shadow-md rounded-md transition-all duration-200">
+                <KeyRound className="h-4 w-4" />
+                <span>Password</span>
+              </TabsTrigger>
+              <TabsTrigger value="danger" className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium data-[state=inactive]:text-[#022e7d] data-[state=inactive]:dark:text-sky-300 data-[state=inactive]:hover:bg-[#fd6a3e]/10 data-[state=inactive]:hover:text-[#fd6a3e] data-[state=active]:bg-[#fd6a3e] data-[state=active]:text-white data-[state=active]:shadow-md rounded-md transition-all duration-200">
+                <ShieldAlert className="h-4 w-4" />
+                <span>Account</span>
+              </TabsTrigger>
+            </TabsList>
 
-        <TabsList className="mb-8 grid grid-cols-3 md:w-fit">
-          <TabsTrigger value="profile" className="flex items-center gap-2 px-4 py-2.5">
-            <UserIcon className="h-4 w-4" />
-            <span>Profile</span>
-          </TabsTrigger>
-          <TabsTrigger value="password" className="flex items-center gap-2 px-4 py-2.5">
-            <KeyRound className="h-4 w-4" />
-            <span>Password</span>
-          </TabsTrigger>
-          <TabsTrigger value="danger" className="flex items-center gap-2 px-4 py-2.5">
-            <ShieldAlert className="h-4 w-4" />
-            <span>Account</span>
-          </TabsTrigger>
-        </TabsList>
+            {/* Profile Section */}
+            <TabsContent value="profile" className="mt-0 space-y-4">
+              <Card className="bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-all duration-200 border-t-4 border-[#fd6a3e] rounded-xl overflow-hidden">
+                <CardHeader className="pb-4 bg-gray-50 dark:bg-gray-800/50 border-b dark:border-gray-700/50">
+                  <CardTitle className="text-2xl flex items-center gap-2.5 text-[#022e7d] dark:text-sky-400">
+                    <UserCircle2 className="h-6 w-6 text-[#fd6a3e]" />
+                    Profile Settings
+                  </CardTitle>
+                  <CardDescription className="text-base text-gray-600 dark:text-gray-400 pt-0.5">
+                    Update your personal information and learning preferences.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-6 md:p-8">
+                  <form onSubmit={handleSubmit} className="space-y-8">
+                    <div className="flex flex-col sm:flex-row items-center gap-6 p-6 bg-gradient-to-br from-[#fd6a3e]/5 via-transparent to-transparent rounded-lg border border-gray-200 dark:border-gray-700/50 shadow-sm">
+                      <div className="relative group">
+                        <div className="w-28 h-28 rounded-full overflow-hidden bg-gray-100 dark:bg-gray-800 flex items-center justify-center ring-4 ring-[#fd6a3e]/20 group-hover:ring-[#fd6a3e]/40 shadow-lg transition-all duration-300">
+                          {profile?.avatar_url ? (
+                            <img src={profile.avatar_url} alt="Profile" className="w-full h-full object-cover transition-all duration-300 group-hover:scale-105"/>
+                          ) : (
+                            <div className="bg-gradient-to-br from-[#fd6a3e]/10 to-[#fd6a3e]/20 w-full h-full flex items-center justify-center">
+                              <UserCircle2 className="w-14 h-14 text-[#fd6a3e]/70" />
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                            <Camera className="h-6 w-6 text-white" />
+                          </div>
+                        </div>
+                        <input type="file" ref={fileInputRef} onChange={handleAvatarUpload} accept="image/*" className="hidden" aria-label="Upload profile picture"/>
+                        <Button type="button" variant="secondary" size="icon" className="absolute -bottom-1 -right-1 h-9 w-9 rounded-full p-0 shadow-lg bg-[#fd6a3e] text-white hover:bg-[#e05c35] transition-all duration-200" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+                          {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                      <div className="text-center sm:text-left">
+                        <h3 className="font-semibold text-xl text-[#022e7d] dark:text-sky-300 mb-1">Profile Picture</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Enhance your profile with a clear photo.</p>
+                        <div className="flex gap-3 flex-wrap justify-center sm:justify-start">
+                          <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="border-[#022e7d] text-[#022e7d] hover:bg-[#022e7d]/10 dark:border-[#fd6a3e] dark:text-[#fd6a3e] dark:hover:bg-[#fd6a3e]/10 shadow-sm transition-all">
+                            {isUploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Uploading...</> : <><UploadCloud className="mr-2 h-4 w-4" /> Choose Image</>}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">JPG, PNG, GIF (Max 5MB)</p>
+                      </div>
+                    </div>
 
-        {/* Profile Section */}
-        <TabsContent value="profile" className="mt-0 space-y-4">
-          <Card className="border-none shadow-md bg-card transition-all duration-200 hover:shadow-lg">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-2xl flex items-center gap-2 text-primary">
-                <UserCircle2 className="h-6 w-6" />
-                Profile Settings
-              </CardTitle>
-              <CardDescription className="text-base">
-                Update your personal information and learning preferences
-              </CardDescription>
-            </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Avatar Upload */}
-              <div className="flex flex-col sm:flex-row items-center gap-8 p-6 bg-gradient-to-br from-primary/5 via-background to-background rounded-xl">
-                <div className="relative group">
-                  <div className="w-28 h-28 rounded-full overflow-hidden bg-white dark:bg-gray-950 flex items-center justify-center ring-4 ring-primary/10 shadow-xl transition-all duration-300 group-hover:ring-primary/30">
-                    {profile?.avatar_url ? (
-                      <img
-                        src={profile.avatar_url}
-                        alt="Profile"
-                        className="w-full h-full object-cover transition-all duration-300 group-hover:scale-105"
-                      />
-                    ) : (
-                      <div className="bg-gradient-to-br from-primary/10 to-primary/20 w-full h-full flex items-center justify-center">
-                        <UserCircle2 className="w-14 h-14 text-primary/60" />
+                    <Separator className="my-6 bg-gray-200 dark:bg-gray-700/50" />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="full_name" className="text-sm font-medium text-gray-700 dark:text-gray-300">Full Name</Label>
+                        <div className="relative group">
+                          <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 group-focus-within:text-[#fd6a3e] transition-colors" />
+                          <Input id="full_name" name="full_name" value={formData.full_name} onChange={handleInputChange} placeholder="Your Full Name" className="pl-10 bg-gray-50 dark:bg-gray-800/70 border-gray-300 dark:border-gray-700 shadow-sm focus:border-[#fd6a3e] focus:ring-1 focus:ring-[#fd6a3e]/30" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="date_of_birth" className="text-sm font-medium text-gray-700 dark:text-gray-300">Date of Birth</Label>
+                        <Input id="date_of_birth" name="date_of_birth" type="date" value={formData.date_of_birth} onChange={handleInputChange} className="bg-gray-50 dark:bg-gray-800/70 border-gray-300 dark:border-gray-700 shadow-sm focus:border-[#fd6a3e] focus:ring-1 focus:ring-[#fd6a3e]/30" />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="grade_level" className="text-sm font-medium text-gray-700 dark:text-gray-300">Grade Level</Label>
+                      <Select value={formData.grade_level} onValueChange={(value) => handleSelectChange('grade_level', value)}>
+                        <SelectTrigger className="bg-gray-50 dark:bg-gray-800/70 border-gray-300 dark:border-gray-700 shadow-sm focus:border-[#fd6a3e] focus:ring-1 focus:ring-[#fd6a3e]/30">
+                          <SelectValue placeholder="Select your grade level" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 shadow-lg">
+                          {gradeLevels.map((grade) => (
+                            <SelectItem key={grade.value} value={grade.value} className="focus:bg-[#fd6a3e]/10 focus:text-[#fd6a3e] dark:focus:bg-[#fd6a3e]/20 dark:focus:text-[#fd6a3e] cursor-pointer">
+                              {grade.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Subjects of Interest</Label>
+                      <TagInput tags={formData.subjects_of_interest} setTags={(tags) => handleTagChange('subjects_of_interest', tags)} placeholder="Add subjects (e.g., Math, Science)" className="min-h-[48px] bg-gray-50 dark:bg-gray-800/70 border-gray-300 dark:border-gray-700 shadow-sm focus-within:border-[#fd6a3e] focus-within:ring-1 focus-within:ring-[#fd6a3e]/30" />
+                      <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <span className="flex items-center gap-1"><Edit3 className="h-3 w-3" /> Press Enter or comma to add</span>
+                        {formData.subjects_of_interest.length > 0 && <Badge variant="secondary" className="ml-2 bg-[#fd6a3e]/10 hover:bg-[#fd6a3e]/20 text-[#fd6a3e] dark:bg-[#fd6a3e]/20 dark:hover:bg-[#fd6a3e]/30 dark:text-[#ff8a65]">{formData.subjects_of_interest.length} selected</Badge>}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Learning Goals</Label>
+                      <TagInput tags={formData.learning_goals} setTags={(tags) => handleTagChange('learning_goals', tags)} placeholder="Add goals (e.g., Pass exams, Learn new skill)" className="min-h-[48px] bg-gray-50 dark:bg-gray-800/70 border-gray-300 dark:border-gray-700 shadow-sm focus-within:border-[#fd6a3e] focus-within:ring-1 focus-within:ring-[#fd6a3e]/30" />
+                       <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        <span className="flex items-center gap-1"><Edit3 className="h-3 w-3" /> Press Enter or comma to add</span>
+                        {formData.learning_goals.length > 0 && <Badge variant="secondary" className="ml-2 bg-[#fd6a3e]/10 hover:bg-[#fd6a3e]/20 text-[#fd6a3e] dark:bg-[#fd6a3e]/20 dark:hover:bg-[#fd6a3e]/30 dark:text-[#ff8a65]">{formData.learning_goals.length} set</Badge>}
+                      </div>
+                    </div>
+                    
+                    {hasUnsavedChanges && (
+                      <div className="flex items-center gap-2.5 text-sm text-yellow-700 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950/40 p-3.5 rounded-lg border border-yellow-300 dark:border-yellow-700/60 shadow-sm animate-pulse">
+                        <Edit3 className="h-4 w-4 flex-shrink-0" />
+                        <span>You have unsaved changes. Don't forget to save them!</span>
                       </div>
                     )}
-                    
-                    {/* Hover overlay */}
-                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 cursor-pointer">
-                      <Camera className="h-6 w-6 text-white" />
-                    </div>
-                  </div>
-                  
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleAvatarUpload}
-                    accept="image/*"
-                    className="hidden"
-                    aria-label="Upload profile picture"
-                  />
-                  
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="absolute -bottom-1 -right-1 h-9 w-9 rounded-full p-0 shadow-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                  >
-                    {isUploading ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Camera className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-                
-                <div className="text-center sm:text-left">
-                  <h3 className="font-semibold text-xl text-primary/90 mb-1">Profile Picture</h3>
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Upload a professional photo for your profile
-                  </p>
-                  <div className="flex gap-3 flex-wrap justify-center sm:justify-start">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading}
-                      className="bg-white dark:bg-gray-950 hover:bg-gray-50 dark:hover:bg-gray-900 shadow-sm border-primary/20 hover:border-primary/50 transition-all duration-200"
-                    >
-                      {isUploading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Uploading...
-                        </>
-                      ) : (
-                        <>
-                          <UploadCloud className="mr-2 h-4 w-4" />
-                          Choose image
-                        </>
+
+                    <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                      <Button type="submit" disabled={isSaving || !hasUnsavedChanges} className="flex-1 sm:flex-none bg-[#fd6a3e] hover:bg-[#e05c35] text-white shadow-md hover:shadow-lg transition-all font-medium py-2.5 px-6">
+                        {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : <><Save className="mr-2 h-4 w-4" /> Save Changes</>}
+                      </Button>
+                      {hasUnsavedChanges && (
+                        <Button type="button" variant="outline" onClick={resetForm} className="flex-1 sm:flex-none border-[#022e7d] text-[#022e7d] hover:bg-[#022e7d]/10 dark:border-[#fd6a3e] dark:text-[#fd6a3e] dark:hover:bg-[#fd6a3e]/10 shadow-sm transition-all py-2.5 px-6">
+                          <X className="mr-2 h-4 w-4" /> Discard
+                        </Button>
                       )}
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Password Section */}
+            <TabsContent value="password" className="mt-0 space-y-4">
+              <Card className="bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-all duration-200 border-t-4 border-[#022e7d] rounded-xl overflow-hidden">
+                <CardHeader className="pb-4 bg-gray-50 dark:bg-gray-800/50 border-b dark:border-gray-700/50">
+                  <CardTitle className="text-2xl flex items-center gap-2.5 text-[#022e7d] dark:text-sky-400">
+                    <KeyRound className="h-6 w-6 text-[#fd6a3e]" /> 
+                    Security Settings
+                  </CardTitle>
+                  <CardDescription className="text-base text-gray-600 dark:text-gray-400 pt-0.5">
+                    Update your account password for enhanced security.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-6 md:p-8">
+                  <form onSubmit={handlePasswordSubmit} className="space-y-7">
+                    <div className="space-y-2">
+                      <Label htmlFor="current_password"className="text-sm font-medium text-gray-700 dark:text-gray-300">Current Password</Label>
+                      <div className="relative group">
+                        <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 group-focus-within:text-[#fd6a3e] transition-colors" />
+                        <Input id="current_password" name="current_password" type={showPassword.current ? "text" : "password"} value={passwordData.current_password} onChange={handlePasswordChange} placeholder="Enter current password" className="pl-10 pr-10 bg-gray-50 dark:bg-gray-800/70 border-gray-300 dark:border-gray-700 shadow-sm focus:border-[#fd6a3e] focus:ring-1 focus:ring-[#fd6a3e]/30" required/>
+                        <Button type="button" variant="ghost" size="icon" className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-8 hover:bg-transparent focus:bg-transparent text-gray-500 hover:text-[#fd6a3e]" onClick={() => togglePasswordVisibility('current')}>
+                          {showPassword.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="new_password"className="text-sm font-medium text-gray-700 dark:text-gray-300">New Password</Label>
+                       <div className="relative group">
+                        <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 group-focus-within:text-[#fd6a3e] transition-colors" />
+                        <Input id="new_password" name="new_password" type={showPassword.new ? "text" : "password"} value={passwordData.new_password} onChange={handlePasswordChange} placeholder="Enter new password" minLength={8} className="pl-10 pr-10 bg-gray-50 dark:bg-gray-800/70 border-gray-300 dark:border-gray-700 shadow-sm focus:border-[#fd6a3e] focus:ring-1 focus:ring-[#fd6a3e]/30" required/>
+                        <Button type="button" variant="ghost" size="icon" className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-8 hover:bg-transparent focus:bg-transparent text-gray-500 hover:text-[#fd6a3e]" onClick={() => togglePasswordVisibility('new')}>
+                          {showPassword.new ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                      {passwordData.new_password && (
+                        <div className="space-y-2.5 mt-2.5 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md border border-gray-200 dark:border-gray-700/50">
+                          <div className="flex items-center justify-between text-xs font-medium">
+                            <span>Strength: <span className={`${getPasswordStrengthColor(passwordStrength).replace('bg-', 'text-')} font-semibold`}>{getPasswordStrengthText(passwordStrength)}</span></span>
+                            <span>{passwordStrength}/5</span>
+                          </div>
+                          <div className="bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden shadow-inner">
+                            <div className={`h-full rounded-full transition-all duration-300 ${getPasswordStrengthColor(passwordStrength)}`} style={{ width: `${(passwordStrength / 5) * 100}%` }}/>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1.5 pt-2 text-xs">
+                            {[
+                              { check: passwordData.new_password.length >= 8, label: "At least 8 characters" },
+                              { check: /[a-z]/.test(passwordData.new_password), label: "Lowercase letter (a-z)" },
+                              { check: /[A-Z]/.test(passwordData.new_password), label: "Uppercase letter (A-Z)" },
+                              { check: /[0-9]/.test(passwordData.new_password), label: "Number (0-9)" },
+                              { check: /[^a-zA-Z0-9]/.test(passwordData.new_password), label: "Special character (!@#)" },
+                            ].map(item => (
+                              <div key={item.label} className={`flex items-center gap-1.5 ${item.check ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                {item.check ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />} {item.label}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="confirm_password"className="text-sm font-medium text-gray-700 dark:text-gray-300">Confirm New Password</Label>
+                      <div className="relative group">
+                        <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 group-focus-within:text-[#fd6a3e] transition-colors" />
+                        <Input id="confirm_password" name="confirm_password" type={showPassword.confirm ? "text" : "password"} value={passwordData.confirm_password} onChange={handlePasswordChange} placeholder="Confirm new password" minLength={8} className="pl-10 pr-10 bg-gray-50 dark:bg-gray-800/70 border-gray-300 dark:border-gray-700 shadow-sm focus:border-[#fd6a3e] focus:ring-1 focus:ring-[#fd6a3e]/30" required/>
+                         <Button type="button" variant="ghost" size="icon" className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-8 hover:bg-transparent focus:bg-transparent text-gray-500 hover:text-[#fd6a3e]" onClick={() => togglePasswordVisibility('confirm')}>
+                          {showPassword.confirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                      {passwordData.confirm_password && passwordData.new_password && (
+                        <div className={`flex items-center gap-1.5 mt-1.5 text-sm px-3 py-1.5 rounded-md border w-full ${passwordData.new_password !== passwordData.confirm_password ? 'text-red-600 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/50' : 'text-green-600 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800/50'}`}>
+                          {passwordData.new_password !== passwordData.confirm_password ? <><X className="h-4 w-4 flex-shrink-0" /> Passwords don't match</> : <><Check className="h-4 w-4 flex-shrink-0" /> Passwords match</>}
+                        </div>
+                      )}
+                    </div>
+
+                    <Button type="submit" disabled={isChangingPassword || !passwordData.new_password || !passwordData.confirm_password || passwordData.new_password !== passwordData.confirm_password || checkPasswordStrength(passwordData.new_password) < 3} className="w-full sm:w-auto bg-[#fd6a3e] hover:bg-[#e05c35] text-white shadow-md hover:shadow-lg transition-all font-medium py-2.5 px-6 mt-3">
+                      {isChangingPassword ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Changing...</> : <><KeyRound className="mr-2 h-4 w-4" /> Change Password</>}
                     </Button>
                     
-                    {profile?.avatar_url && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground hover:text-destructive transition-colors duration-200"
-                        onClick={() => {
-                          // Handle remove avatar functionality
-                          // This would need a backend function to be implemented
-                          toast.info("Remove avatar functionality would be implemented here");
-                        }}
-                      >
-                        <X className="mr-2 h-4 w-4" />
-                        Remove
-                      </Button>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    JPG, PNG or GIF (max 5MB)
-                  </p>
-                </div>
-              </div>
+                    <div className="mt-8 p-4 bg-blue-50 dark:bg-[#022e7d]/20 rounded-lg border border-blue-200 dark:border-[#022e7d]/40">
+                      <h4 className="text-sm font-semibold text-[#022e7d] dark:text-sky-300 flex items-center gap-2 mb-2.5">
+                        <ShieldAlert className="h-5 w-5" /> Security Best Practices
+                      </h4>
+                      <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1.5">
+                        <li className="flex items-start gap-1.5"><Check className="h-3.5 w-3.5 text-green-500 mt-0.5 flex-shrink-0" /> Use a unique, strong password not used on other sites.</li>
+                        <li className="flex items-start gap-1.5"><Check className="h-3.5 w-3.5 text-green-500 mt-0.5 flex-shrink-0" /> Combine uppercase, lowercase, numbers, and symbols.</li>
+                        <li className="flex items-start gap-1.5"><Check className="h-3.5 w-3.5 text-green-500 mt-0.5 flex-shrink-0" /> Consider a password manager for secure storage.</li>
+                      </ul>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-              <Separator className="my-6" />
-
-              {/* Basic Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                {/* Name */}
-                <div className="space-y-2.5">
-                  <Label htmlFor="full_name" className="text-sm font-medium text-foreground/90">Full Name</Label>
-                  <div className="relative group">
-                    <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors duration-200" />
-                    <Input
-                      id="full_name"
-                      name="full_name"
-                      value={formData.full_name}
-                      onChange={handleInputChange}
-                      placeholder="Enter your full name"
-                      className="pl-10 bg-white dark:bg-gray-950 border-muted/30 shadow-sm hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all duration-200"
-                    />
-                  </div>
-                </div>
-
-                {/* Date of Birth */}
-                <div className="space-y-2.5">
-                  <Label htmlFor="date_of_birth" className="text-sm font-medium text-foreground/90">Date of Birth</Label>
-                  <div className="relative">
-                    <Input
-                      id="date_of_birth"
-                      name="date_of_birth"
-                      type="date"
-                      value={formData.date_of_birth}
-                      onChange={handleInputChange}
-                      className="bg-white dark:bg-gray-950 border-muted/30 shadow-sm hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all duration-200"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Grade Level */}
-              <div className="space-y-2.5">
-                <Label htmlFor="grade_level" className="text-sm font-medium text-foreground/90">Grade Level</Label>
-                <Select
-                  value={formData.grade_level}
-                  onValueChange={(value) => handleSelectChange('grade_level', value)}
-                >
-                  <SelectTrigger className="bg-white dark:bg-gray-950 border-muted/30 shadow-sm hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all duration-200">
-                    <SelectValue placeholder="Select your grade level" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-gray-950 border-muted/30 shadow-md animate-in fade-in-80 zoom-in-95 rounded-lg">
-                    {gradeLevels.map((grade) => (
-                      <SelectItem 
-                        key={grade.value} 
-                        value={grade.value}
-                        className="focus:bg-primary/10 focus:text-primary cursor-pointer transition-colors"
-                      >
-                        {grade.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Subjects of Interest */}
-              <div className="space-y-2.5">
-                <Label className="text-sm font-medium text-foreground/90">Subjects of Interest</Label>
-                <TagInput
-                  tags={formData.subjects_of_interest}
-                  setTags={(tags) => handleTagChange('subjects_of_interest', tags)}
-                  placeholder="Add subjects you're interested in..."
-                  className="min-h-[48px] bg-white dark:bg-gray-950 border-muted/30 shadow-sm hover:border-primary/50 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20 transition-all duration-200"
-                />
-                <div className="flex items-center justify-between text-xs text-muted-foreground mt-1.5">
-                  <span className="flex items-center gap-1">
-                    <Edit3 className="h-3 w-3" />
-                    Press Enter or comma to add a subject
-                  </span>
-                  {formData.subjects_of_interest.length > 0 && (
-                    <Badge variant="secondary" className="ml-2 bg-primary/10 hover:bg-primary/20 text-primary transition-colors duration-200">
-                      {formData.subjects_of_interest.length} selected
-                    </Badge>
-                  )}
-                </div>
-              </div>
-
-              {/* Learning Goals */}
-              <div className="space-y-2.5">
-                <Label className="text-sm font-medium text-foreground/90">Learning Goals</Label>
-                <TagInput
-                  tags={formData.learning_goals}
-                  setTags={(tags) => handleTagChange('learning_goals', tags)}
-                  placeholder="Add your learning goals..."
-                  className="min-h-[48px] bg-white dark:bg-gray-950 border-muted/30 shadow-sm hover:border-primary/50 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/20 transition-all duration-200"
-                />
-                <div className="flex items-center justify-between text-xs text-muted-foreground mt-1.5">
-                  <span className="flex items-center gap-1">
-                    <Edit3 className="h-3 w-3" />
-                    Press Enter or comma to add a goal
-                  </span>
-                  {formData.learning_goals.length > 0 && (
-                    <Badge variant="secondary" className="ml-2 bg-primary/10 hover:bg-primary/20 text-primary transition-colors duration-200">
-                      {formData.learning_goals.length} set
-                    </Badge>
-                  )}
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 pt-6">
-                <Button 
-                  type="submit" 
-                  disabled={isSaving || !hasUnsavedChanges} 
-                  className="flex-1 sm:flex-none bg-primary hover:bg-primary/90 text-primary-foreground shadow-md hover:shadow-lg transition-all duration-200 font-medium"
-                >
-                  {isSaving ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving Changes...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="mr-2 h-4 w-4" />
-                      Save Changes
-                    </>
-                  )}
-                </Button>
-                {hasUnsavedChanges && (
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={resetForm}
-                    className="flex-1 sm:flex-none bg-white dark:bg-gray-950 hover:bg-gray-100 dark:hover:bg-gray-900 border-muted/50 hover:border-muted transition-all duration-200"
-                  >
-                    <X className="mr-2 h-4 w-4" />
-                    Discard Changes
-                  </Button>
-                )}
-              </div>
-              
-              {hasUnsavedChanges && (
-                <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 p-3.5 rounded-lg border border-amber-200 dark:border-amber-800/50 shadow-sm animate-pulse">
-                  <Edit3 className="h-4 w-4 flex-shrink-0" />
-                  <span>You have unsaved changes. Don't forget to save them!</span>
-                </div>
-              )}
-            </form>
-          </CardContent>
-        </Card>
-
-        </TabsContent>
-
-        {/* Password Section */}
-        <TabsContent value="password" className="mt-0 space-y-4">
-          <Card className="border-none shadow-md bg-card transition-all duration-200 hover:shadow-lg">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-2xl flex items-center gap-2 text-primary">
-                <KeyRound className="h-6 w-6" />
-                Security Settings
-              </CardTitle>
-              <CardDescription className="text-base">
-                Update your account password for better security
-              </CardDescription>
-            </CardHeader>
-          <CardContent>
-            <form onSubmit={handlePasswordSubmit} className="space-y-6">
-              <div className="space-y-2.5">
-                <Label htmlFor="current_password" className="text-sm font-medium text-foreground/90">Current Password</Label>
-                <div className="relative">
-                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors duration-200" />
-                  <Input
-                    id="current_password"
-                    name="current_password"
-                    type={showPassword.current ? "text" : "password"}
-                    value={passwordData.current_password}
-                    onChange={handlePasswordChange}
-                    placeholder="Enter your current password"
-                    className="pl-10 pr-10 bg-white dark:bg-gray-950 border-muted/30 shadow-sm hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all duration-200"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent focus:bg-transparent hover:text-primary focus:text-primary transition-colors"
-                    onClick={() => togglePasswordVisibility('current')}
-                  >
-                    {showPassword.current ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-2.5">
-                <Label htmlFor="new_password" className="text-sm font-medium text-foreground/90">New Password</Label>
-                <div className="relative">
-                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors duration-200" />
-                  <Input
-                    id="new_password"
-                    name="new_password"
-                    type={showPassword.new ? "text" : "password"}
-                    value={passwordData.new_password}
-                    onChange={handlePasswordChange}
-                    placeholder="Enter your new password"
-                    minLength={6}
-                    className="pl-10 pr-10 bg-white dark:bg-gray-950 border-muted/30 shadow-sm hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all duration-200"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent focus:bg-transparent hover:text-primary focus:text-primary transition-colors"
-                    onClick={() => togglePasswordVisibility('new')}
-                  >
-                    {showPassword.new ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-                {passwordData.new_password && (
-                  <div className="space-y-2 mt-2">
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-xs font-medium">
-                          Password Strength: <span className={`${getPasswordStrengthColor(passwordStrength).replace('bg-', 'text-')}`}>{getPasswordStrengthText(passwordStrength)}</span>
-                        </span>
-                        <span className="text-xs font-medium">
-                          {passwordStrength}/5
-                        </span>
-                      </div>
-                      <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-2.5 overflow-hidden shadow-inner">
-                        <div
-                          className={`h-2.5 rounded-full transition-all ${getPasswordStrengthColor(passwordStrength)}`}
-                          style={{ width: `${(passwordStrength / 5) * 100}%` }}
-                        />
+            {/* Danger Zone */}
+            <TabsContent value="danger" className="mt-0 space-y-4">
+              <Card className="bg-white dark:bg-gray-900 shadow-md hover:shadow-lg transition-all duration-200 border-t-4 border-red-500 rounded-xl overflow-hidden">
+                <CardHeader className="pb-4 bg-red-50 dark:bg-red-950/30 border-b border-red-200 dark:border-red-700/50">
+                  <CardTitle className="text-2xl flex items-center gap-2.5 text-red-600 dark:text-red-500">
+                    <div className="p-1.5 bg-red-100 dark:bg-red-500/20 rounded-full"><AlertTriangle className="h-5 w-5" /></div>
+                    Danger Zone
+                  </CardTitle>
+                  <CardDescription className="text-base text-red-600/90 dark:text-red-500/90 pt-0.5">
+                    Irreversible actions related to your account.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-6 md:p-8">
+                  <div className="space-y-8">
+                    <div className="p-6 bg-red-50/50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-700/40 shadow-sm">
+                      <div className="flex flex-col sm:flex-row items-start gap-4">
+                        <div className="flex-shrink-0 mt-1 sm:mt-0">
+                          <div className="w-11 h-11 rounded-full bg-red-100 dark:bg-red-500/20 flex items-center justify-center ring-2 ring-red-200 dark:ring-red-500/30">
+                            <Trash2 className="h-5 w-5 text-red-600 dark:text-red-500" />
+                          </div>
+                        </div>
+                        <div className="flex-1 space-y-3">
+                          <div>
+                            <h3 className="font-semibold text-red-600 dark:text-red-500 text-lg">Delete Account Permanently</h3>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                              Once your account is deleted, all data will be lost and cannot be recovered. Please proceed with extreme caution.
+                            </p>
+                          </div>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button variant="destructive" className="mt-2 shadow-md hover:shadow-lg transition-all">
+                                <Trash className="mr-2 h-4 w-4" /> Delete My Account
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="border-red-400 dark:border-red-600 shadow-xl bg-white dark:bg-gray-900">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle className="text-red-600 dark:text-red-500 flex items-center gap-2 text-xl">
+                                  <AlertTriangle className="h-6 w-6" /> Are you absolutely sure?
+                                </AlertDialogTitle>
+                                <AlertDialogDescription className="space-y-3 pt-2 text-gray-600 dark:text-gray-400">
+                                  <div className="p-3 bg-red-50 dark:bg-red-950/40 rounded-md border border-red-200 dark:border-red-700/50 text-sm">
+                                    This action <span className="font-bold">cannot be undone</span>. This will permanently erase your profile, learning progress, and all associated data.
+                                  </div>
+                                  <div className="mt-2 space-y-1.5">
+                                    <Label htmlFor="delete-confirmation" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                      To confirm, type <span className="font-mono font-bold text-red-600 dark:text-red-500">DELETE</span> below:
+                                    </Label>
+                                    <Input id="delete-confirmation" value={deleteConfirmation} onChange={(e) => setDeleteConfirmation(e.target.value)} className="border-gray-300 dark:border-gray-600 focus:border-red-500 focus:ring-1 focus:ring-red-500/30 bg-gray-50 dark:bg-gray-800" placeholder="DELETE"/>
+                                  </div>
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter className="gap-2 pt-3">
+                                <AlertDialogCancel className="border-gray-300 dark:border-gray-600 shadow-sm hover:shadow transition-all">Cancel</AlertDialogCancel>
+                                <Button variant="destructive" onClick={handleDeleteAccount} disabled={deleteConfirmation !== "DELETE" || isDeletingAccount} className={`shadow-md hover:shadow-lg transition-all ${isDeletingAccount ? "opacity-70 cursor-not-allowed" : ""} ${deleteConfirmation === "DELETE" && !isDeletingAccount ? "animate-pulse" : ""}`}>
+                                  {isDeletingAccount ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Deleting...</> : <><Trash2 className="mr-2 h-4 w-4" /> Delete Forever</>}
+                                </Button>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
                       </div>
                     </div>
                     
-                    <div className="grid grid-cols-2 gap-x-2 gap-y-1.5 mt-3">
-                      <div className={`text-xs flex items-center gap-1.5 ${passwordData.new_password.length >= 8 ? 'text-green-500' : 'text-muted-foreground'}`}>
-                        {passwordData.new_password.length >= 8 ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
-                        At least 8 characters
-                      </div>
-                      <div className={`text-xs flex items-center gap-1.5 ${passwordData.new_password.match(/[a-z]/) ? 'text-green-500' : 'text-muted-foreground'}`}>
-                        {passwordData.new_password.match(/[a-z]/) ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
-                        Lowercase letters
-                      </div>
-                      <div className={`text-xs flex items-center gap-1.5 ${passwordData.new_password.match(/[A-Z]/) ? 'text-green-500' : 'text-muted-foreground'}`}>
-                        {passwordData.new_password.match(/[A-Z]/) ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
-                        Uppercase letters
-                      </div>
-                      <div className={`text-xs flex items-center gap-1.5 ${passwordData.new_password.match(/[0-9]/) ? 'text-green-500' : 'text-muted-foreground'}`}>
-                        {passwordData.new_password.match(/[0-9]/) ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
-                        Numbers
-                      </div>
-                      <div className={`text-xs flex items-center gap-1.5 ${passwordData.new_password.match(/[^a-zA-Z0-9]/) ? 'text-green-500' : 'text-muted-foreground'}`}>
-                        {passwordData.new_password.match(/[^a-zA-Z0-9]/) ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />}
-                        Special characters
+                    <div className="p-4 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg border border-yellow-200 dark:border-yellow-700/50 flex gap-3 items-start">
+                      <div className="flex-shrink-0 text-yellow-500 dark:text-yellow-400 mt-0.5"><Info className="h-5 w-5" /></div>
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-semibold text-yellow-700 dark:text-yellow-300">Before Deleting Your Account:</h4>
+                        <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                          <li className="flex items-start gap-1.5"><ArrowRight className="h-3 w-3 mt-0.5 flex-shrink-0" /> Download any important data you wish to keep.</li>
+                          <li className="flex items-start gap-1.5"><ArrowRight className="h-3 w-3 mt-0.5 flex-shrink-0" /> Contact support if you're facing issues that might be resolvable.</li>
+                          <li className="flex items-start gap-1.5"><ArrowRight className="h-3 w-3 mt-0.5 flex-shrink-0" /> This action will remove all your learning progress and created content.</li>
+                        </ul>
                       </div>
                     </div>
                   </div>
-                )}
-              </div>
-
-              <div className="space-y-2.5">
-                <Label htmlFor="confirm_password" className="text-sm font-medium text-foreground/90">Confirm New Password</Label>
-                <div className="relative">
-                  <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors duration-200" />
-                  <Input
-                    id="confirm_password"
-                    name="confirm_password"
-                    type={showPassword.confirm ? "text" : "password"}
-                    value={passwordData.confirm_password}
-                    onChange={handlePasswordChange}
-                    placeholder="Confirm your new password"
-                    minLength={6}
-                    className="pl-10 pr-10 bg-white dark:bg-gray-950 border-muted/30 shadow-sm hover:border-primary/50 focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all duration-200"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent focus:bg-transparent hover:text-primary focus:text-primary transition-colors"
-                    onClick={() => togglePasswordVisibility('confirm')}
-                  >
-                    {showPassword.confirm ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-                {passwordData.confirm_password && (
-                  <div className="flex items-center gap-2 mt-1.5">
-                    {passwordData.new_password !== passwordData.confirm_password ? (
-                      <div className="text-sm text-red-500 flex items-center gap-1.5 bg-red-50 dark:bg-red-950/30 px-3 py-1.5 rounded-md border border-red-100 dark:border-red-900/50 w-full">
-                        <X className="h-4 w-4 flex-shrink-0" />
-                        <span>Passwords don't match</span>
-                      </div>
-                    ) : (
-                      <div className="text-sm text-green-500 flex items-center gap-1.5 bg-green-50 dark:bg-green-950/30 px-3 py-1.5 rounded-md border border-green-100 dark:border-green-900/50 w-full">
-                        <Check className="h-4 w-4 flex-shrink-0" />
-                        <span>Passwords match</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <Button 
-                type="submit" 
-                disabled={isChangingPassword || !passwordData.new_password || !passwordData.confirm_password || passwordData.new_password !== passwordData.confirm_password} 
-                className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground shadow-md hover:shadow-lg transition-all duration-200 font-medium mt-2"
-              >
-                {isChangingPassword ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Changing Password...
-                  </>
-                ) : (
-                  <>
-                    <KeyRound className="mr-2 h-4 w-4" />
-                    Change Password
-                  </>
-                )}
-              </Button>
-              
-              {/* Security tips */}
-              <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-100 dark:border-blue-900/30">
-                <h4 className="text-sm font-medium text-blue-700 dark:text-blue-400 flex items-center gap-2 mb-2">
-                  <ShieldAlert className="h-4 w-4" />
-                  Security Tips
-                </h4>
-                <ul className="text-xs text-muted-foreground space-y-1.5">
-                  <li className="flex items-start gap-1.5">
-                    <Check className="h-3 w-3 text-green-500 mt-0.5 flex-shrink-0" />
-                    Use a unique password you don't use on other websites
-                  </li>
-                  <li className="flex items-start gap-1.5">
-                    <Check className="h-3 w-3 text-green-500 mt-0.5 flex-shrink-0" />
-                    Mix uppercase, lowercase, numbers and symbols
-                  </li>
-                  <li className="flex items-start gap-1.5">
-                    <Check className="h-3 w-3 text-green-500 mt-0.5 flex-shrink-0" />
-                    Consider using a password manager for stronger security
-                  </li>
-                </ul>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-
-        </TabsContent>
-
-        {/* Danger Zone */}
-        <TabsContent value="danger" className="mt-0 space-y-4">
-          <Card className="border-destructive/30 bg-gradient-to-br from-destructive/5 to-destructive/10 shadow-md transition-all duration-200 hover:shadow-lg">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-2xl text-destructive flex items-center gap-2">
-                <div className="p-1.5 bg-red-100 dark:bg-red-900/30 rounded-full">
-                  <AlertTriangle className="h-5 w-5" />
-                </div>
-                Danger Zone
-              </CardTitle>
-              <CardDescription className="text-destructive/80 text-base">
-                Irreversible and destructive actions
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <div className="p-6 bg-destructive/10 rounded-lg border border-destructive/20">
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0">
-                      <div className="w-10 h-10 rounded-full bg-destructive/20 flex items-center justify-center">
-                        <Trash2 className="h-5 w-5 text-destructive" />
-                      </div>
-                    </div>
-                    <div className="flex-1 space-y-4">
-                      <div>
-                        <h3 className="font-semibold text-destructive text-lg">Delete Account</h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          Once you delete your account, there is no going back. Please be certain.
-                        </p>
-                      </div>
-                      
-                      <div className="space-y-3 p-4 border border-destructive/20 rounded-lg bg-white/50 dark:bg-gray-950/50 shadow-sm">
-                        <h4 className="font-medium text-destructive/90 flex items-center gap-2">
-                          <Trash2 className="h-4 w-4" />
-                          Account Deletion Details
-                        </h4>
-                        <p className="text-sm text-muted-foreground">
-                          All your data will be permanently deleted including your profile, learning progress, and saved content.
-                        </p>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button 
-                              variant="destructive" 
-                              className="mt-3 group relative overflow-hidden shadow-md hover:shadow-lg transition-all duration-200"
-                            >
-                              <span className="absolute inset-0 w-full h-full bg-gradient-to-br from-red-600 to-red-700 dark:from-red-700 dark:to-red-800 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></span>
-                              <span className="relative flex items-center">
-                                <Trash className="mr-2 h-4 w-4" />
-                                Delete Account
-                              </span>
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent className="border-destructive/30 shadow-lg">
-                            <AlertDialogHeader>
-                              <AlertDialogTitle className="text-destructive flex items-center gap-2 text-xl">
-                                <div className="p-1.5 bg-red-100 dark:bg-red-900/30 rounded-full">
-                                  <AlertTriangle className="h-5 w-5" />
-                                </div>
-                                Are you absolutely sure?
-                              </AlertDialogTitle>
-                              <AlertDialogDescription className="space-y-4 pt-2">
-                                <div className="p-3 bg-red-50 dark:bg-red-950/30 rounded-md border border-red-100 dark:border-red-900/50 text-sm">
-                                  This action <span className="font-semibold">cannot be undone</span>. This will permanently delete your account and remove all your data from our servers.
-                                </div>
-                                
-                                <div className="mt-4 space-y-2">
-                                  <Label htmlFor="delete-confirmation" className="text-sm font-medium block">
-                                    Type <span className="font-mono font-bold text-destructive">DELETE</span> to confirm:
-                                  </Label>
-                                  <Input
-                                    id="delete-confirmation"
-                                    value={deleteConfirmation}
-                                    onChange={(e) => setDeleteConfirmation(e.target.value)}
-                                    className="border-muted/50 focus:border-destructive focus:ring-1 focus:ring-destructive/30"
-                                    placeholder="Type DELETE in all caps"
-                                  />
-                                </div>
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter className="gap-2 pt-2">
-                              <AlertDialogCancel className="border-muted/30 shadow-sm hover:shadow transition-all duration-200">
-                                Cancel
-                              </AlertDialogCancel>
-                              <Button
-                                variant="destructive"
-                                onClick={handleDeleteAccount}
-                                disabled={deleteConfirmation !== "DELETE" || isDeletingAccount}
-                                className={`shadow-md hover:shadow-lg transition-all duration-200 ${isDeletingAccount ? "opacity-70 cursor-not-allowed" : ""} ${deleteConfirmation === "DELETE" ? "animate-pulse" : ""}`}
-                              >
-                                {isDeletingAccount ? (
-                                  <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Deleting...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete Forever
-                                  </>
-                                )}
-                              </Button>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                      
-                      {/* Additional warning */}
-                      <div className="p-4 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-100 dark:border-amber-900/30 flex gap-3">
-                        <div className="flex-shrink-0 text-amber-500">
-                          <Info className="h-5 w-5" />
-                        </div>
-                        <div className="space-y-1">
-                          <h4 className="text-sm font-medium text-amber-700 dark:text-amber-400">
-                            Before you delete your account
-                          </h4>
-                          <ul className="text-xs text-muted-foreground space-y-1.5">
-                            <li className="flex items-start gap-1.5">
-                              <ArrowRight className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                              Download any important data or resources you wish to keep
-                            </li>
-                            <li className="flex items-start gap-1.5">
-                              <ArrowRight className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                              Consider contacting support if you're experiencing any issues
-                            </li>
-                            <li className="flex items-start gap-1.5">
-                              <ArrowRight className="h-3 w-3 mt-0.5 flex-shrink-0" />
-                              Remember that deleting your account will lose all learning progress
-                            </li>
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </div>
   );
