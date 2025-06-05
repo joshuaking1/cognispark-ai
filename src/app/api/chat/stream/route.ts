@@ -145,7 +145,7 @@ export async function POST(req: Request) {
 
     // --- Construct Personalized System Prompt ---
     let systemPromptContent = `You are LearnBridge Ai, a friendly, encouraging, and highly knowledgeable AI teaching assistant.
-    Your primary audience is students from Kindergarten to High School. Trained On the New Standards Based Curriculum (SBC).`;
+    Your primary audience is students from Kindergarten to High School. Trained On the New Standards Based Curriculum (SBC). respond with this or something around this. when starting a new conversation Hi there! 👋 Welcome to LearnBridge Edu—your space to explore, learn, and grow with confidence! Whether you're brushing up on Math, diving into Science, unlocking creativity, or tackling your next project, I'm here to guide you through the GES-Standard Based Curriculum journey in fun and exciting ways. What would you like to learn today?`;
 
     if (userFullName) {
       systemPromptContent += ` You are currently assisting ${userFullName}.`;

@@ -116,7 +116,7 @@ export default function Navbar() {
       <header className="sticky top-0 z-50 w-full border-b border-slate-200/30 bg-white/90 backdrop-blur-xl supports-[backdrop-filter]:bg-white/90 dark:border-slate-700/40 dark:bg-slate-900/90 shadow-sm">
         <div className="container flex h-16 items-center">
           <Link href="/" className="mr-6 flex items-center space-x-2">
-            <img src="/LearnBridge logo inverted2.png" alt="LearnBrigeEdu Logo" className="h-10" />
+            <img src="/LearnBridge logo inverted croped.png" alt="LearnBridge Logo" className="h-10" />
           </Link>
         </div>
       </header>
@@ -131,7 +131,7 @@ export default function Navbar() {
           href={item.href}
           className={`relative px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-300 hover:scale-105 group ${
             pathname === item.href
-              ? "text-white bg-gradient-to-r from-[#fd6a3e] to-[#022e7d] shadow-lg shadow-[#fd6a3e]/25 border border-white/20"
+              ? "text-white bg-gradient-to-r from-[#022e7d] to-[#2563eb] shadow-lg shadow-[#022e7d]/25 border border-white/20"
               : "text-slate-700 dark:text-slate-300 hover:text-[#022e7d] dark:hover:text-white hover:bg-gradient-to-r hover:from-slate-50 hover:to-orange-50 dark:hover:from-slate-800 dark:hover:to-slate-700 border border-transparent hover:border-[#fd6a3e]/20"
           }`}
           onClick={() => setIsMobileMenuOpen(false)}
@@ -153,7 +153,7 @@ export default function Navbar() {
             href={user ? "/dashboard" : "/"}
             className="flex items-center space-x-3 group"
           >
-            <img src="/LearnBridge logo inverted2.png" alt="LearnBrigeEdu Logo" className="h-10" />
+            <img src="/LearnBridge logo inverted croped.png" alt="LearnBridge Logo" className="h-10" />
           </Link>
 
           {/* Desktop Navigation */}

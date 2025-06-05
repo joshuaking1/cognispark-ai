@@ -48,13 +48,13 @@ export default function LoginPage() {
     <div className="container relative h-screen flex-col items-center justify-center grid lg:max-w-none lg:grid-cols-2 lg:px-0">
       <div className="relative hidden h-full flex-col p-10 text-white lg:flex dark:border-r">
         <div className="absolute inset-0" style={{
-          background: `linear-gradient(135deg, #022e7d 0%, #fd6a3e 50%, #ff8a65 100%)`
+          background: `linear-gradient(135deg, #022e7d 0%, #1e40af 70%, #2563eb 100%)`
         }} />
         <div className="absolute inset-0 bg-black/10" />
         
         <div className="relative z-20 flex items-center text-lg font-medium">
           <div className="mr-3 p-2 rounded-lg">
-            <img src="/LearnBridge logo inverted2.png" alt="LearnBrigeEdu Logo" className="h-8 w-auto" />
+            <img src="/LearnBridge logo inverted croped.png" alt="LearnBridge Logo" className="h-10 w-auto" />
           </div>
         </div>
         
@@ -90,7 +90,7 @@ export default function LoginPage() {
           <CardHeader className="relative space-y-4 pb-8">
             <div className="flex justify-center mb-4">
               <div className="p-4 rounded-full shadow-lg bg-white">
-                <img src="/LearnBridge logo inverted2.png" alt="LearnBrigeEdu Logo" className="h-10 w-auto" />
+                <img src="/LearnBridge logo inverted croped.png" alt="LearnBridge Logo" className="h-12 w-auto" />
               </div>
             </div>
             <CardTitle className="text-3xl font-bold text-center" style={{
@@ -182,19 +182,8 @@ export default function LoginPage() {
               <Button 
                 disabled={loading} 
                 type="submit" 
-                className="w-full h-12 text-base font-semibold text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] hover:shadow-2xl"
-                style={{
-                  background: `linear-gradient(135deg, #fd6a3e 0%, #022e7d 100%)`,
-                  boxShadow: `0 10px 25px rgba(253, 106, 62, 0.3)`
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = `linear-gradient(135deg, #ff7849 0%, #033a94 100%)`;
-                  e.currentTarget.style.boxShadow = `0 15px 35px rgba(253, 106, 62, 0.4)`;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = `linear-gradient(135deg, #fd6a3e 0%, #022e7d 100%)`;
-                  e.currentTarget.style.boxShadow = `0 10px 25px rgba(253, 106, 62, 0.3)`;
-                }}
+                className="w-full h-12 text-base font-semibold text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] hover:shadow-2xl bg-[#022e7d] hover:bg-[#011f5a]"
+                style={{ boxShadow: `0 10px 25px rgba(2, 46, 125, 0.3)` }}
               >
                 {loading ? (
                   <>

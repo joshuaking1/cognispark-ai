@@ -75,7 +75,7 @@ export default function VoiceCallPage() {
       <div>
         <h1 className="text-3xl font-bold text-center">Real-Time Voice Call with Learnbridge AI</h1>
         <p className="mt-2 text-muted-foreground text-center max-w-md">
-          Experience a natural, interruptible conversation with your AI tutor. Just click start and begin talking!
+        Enjoy a smooth, natural conversation with your AI tutor—pause or jump in anytime. Just click start to begin!
         </p>
       </div>
       <VapiCall

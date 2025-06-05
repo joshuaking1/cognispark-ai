@@ -292,7 +292,7 @@ export default function DashboardPage() {
                       <MessageSquare className="h-4 w-4 text-white" />
                     </div>
                     <div className="text-left">
-                      <div className="font-medium text-[#022e7d] dark:text-[#fd6a3e]">Chat with Nova</div>
+                      <div className="font-medium text-[#022e7d] dark:text-[#fd6a3e]">Chat with Learnbridge AI</div>
                       <div className="text-xs text-slate-600 dark:text-slate-400">Ask questions or brainstorm ideas</div>
                     </div>
                   </Link>
@@ -763,7 +763,7 @@ export default function DashboardPage() {
                     <MessageSquare className="h-5 w-5 text-white" />
                   </div>
                   <div className="text-left">
-                    <div className="font-medium text-[#fd6a3e] dark:text-[#fd6a3e]">Chat with Nova</div>
+                    <div className="font-medium text-[#fd6a3e] dark:text-[#fd6a3e]">Chat with Learnbridge AI</div>
                     <div className="text-xs text-slate-600 dark:text-slate-400">Ask questions</div>
                   </div>
                   <ChevronRight className="ml-auto h-4 w-4 text-slate-400 group-hover:text-[#022e7d] group-hover:translate-x-1 transition-all" />
