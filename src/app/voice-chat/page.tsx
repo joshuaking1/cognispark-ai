@@ -45,7 +45,7 @@ export default function VoiceChatPage() {
   const [vapiInstance, setVapiInstance] = useState<any>(null);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("idle");
   const [speechStatus, setSpeechStatus] = useState<SpeechStatus>("idle");
-  const [statusMessage, setStatusMessage] = useState("Ready to connect with Nova");
+  const [statusMessage, setStatusMessage] = useState("Ready to connect with Learnbridge AI");
   const [isMuted, setIsMuted] = useState(false);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -106,7 +106,7 @@ export default function VoiceChatPage() {
       }
       
       setSessionId(newSessionId);
-      setStatusMessage("Connecting to Nova's voice system...");
+      setStatusMessage("Connecting to Learnbridge AI's voice system...");
 
       // Create a new VAPI instance
       const vapi = new Vapi(process.env.NEXT_PUBLIC_VAPI_API_KEY || "");
@@ -115,9 +115,9 @@ export default function VoiceChatPage() {
       vapi.on("call-start", () => {
         setConnectionStatus("connected");
         setSpeechStatus("listening");
-        setStatusMessage("Connected! Nova is ready to chat");
+        setStatusMessage("Connected! Learnbridge AI is ready to chat");
         setStats(prev => ({ ...prev, duration: 0, messagesExchanged: 0 }));
-        toast.success("Connected!", { description: "Voice chat with Nova has started" });
+        toast.success("Connected!", { description: "Voice chat with Learnbridge AI has started" });
       });
       
       vapi.on("call-end", async () => {
@@ -149,12 +149,12 @@ export default function VoiceChatPage() {
       
       vapi.on("speech-start", () => {
         setSpeechStatus("speaking");
-        setStatusMessage("Nova is speaking...");
+        setStatusMessage("Learnbridge AI is speaking...");
       });
       
       vapi.on("speech-end", () => {
         setSpeechStatus("listening");
-        setStatusMessage("Nova is listening...");
+        setStatusMessage("Learnbridge AI is listening...");
       });
 
       vapi.on("message", (message: any) => {
@@ -216,7 +216,7 @@ export default function VoiceChatPage() {
 
   const toggleAudio = () => {
     setIsAudioEnabled(!isAudioEnabled);
-    const newStatus = !isAudioEnabled ? "Nova's voice enabled" : "Nova's voice disabled";
+    const newStatus = !isAudioEnabled ? "Learnbridge AI's voice enabled" : "Learnbridge AI's voice disabled";
     setStatusMessage(newStatus);
     toast.info(newStatus);
     
@@ -291,7 +291,7 @@ export default function VoiceChatPage() {
               </Button>
               <div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-slate-100 dark:to-slate-300 bg-clip-text text-transparent">
-                  Nova Voice Chat
+                  Learnbridge AI Voice Chat
                 </h1>
                 <p className="text-sm text-slate-600 dark:text-slate-400 flex items-center gap-1">
                   <Sparkles className="h-3 w-3" />
@@ -510,7 +510,7 @@ export default function VoiceChatPage() {
                 {[
                   "Use the mute button when you need a moment to think",
                   "Toggle audio if you prefer text-only responses",
-                  "Nova can help with learning, questions, and conversations"
+                  "Learnbridge AI can help with learning, questions, and conversations"
                 ].map((tip, index) => (
                   <div key={index} className="flex items-start gap-4 p-3 rounded-xl bg-gradient-to-r from-purple-50/80 to-pink-50/80 dark:from-purple-950/30 dark:to-pink-950/30 border border-purple-200/30 dark:border-purple-800/30">
                     <div className="w-6 h-6 rounded-full bg-gradient-to-r from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0 mt-0.5">

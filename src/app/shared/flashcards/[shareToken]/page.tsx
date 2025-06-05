@@ -121,7 +121,7 @@ export default function SharedFlashcardSetPage() {
               onClick={() => router.push('/')} 
               className="bg-gradient-to-r from-[#fd6a3e] to-[#f97316] hover:from-[#f97316] hover:to-[#fd6a3e] text-white font-semibold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
             >
-              Go to CogniSpark AI Home
+              Go to LearnBrigeEdu Home
             </Button>
           </div>
         </div>
@@ -143,7 +143,7 @@ export default function SharedFlashcardSetPage() {
               onClick={() => router.push('/')} 
               className="bg-gradient-to-r from-[#fd6a3e] to-[#f97316] hover:from-[#f97316] hover:to-[#fd6a3e] text-white font-semibold px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
             >
-              Go to CogniSpark AI Home
+              Go to LearnBrigeEdu Home
             </Button>
           </div>
         </div>
@@ -296,7 +296,7 @@ export default function SharedFlashcardSetPage() {
               className="bg-gradient-to-r from-[#fd6a3e] to-[#f97316] hover:from-[#f97316] hover:to-[#fd6a3e] text-white font-bold px-10 py-4 rounded-2xl shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105 text-lg"
             >
               <Sparkles className="mr-3 h-5 w-5" />
-              Create your own AI Flashcards with CogniSpark AI!
+              Create your own AI Flashcards with LearnBrigeEdu!
             </Button>
           </div>
         </div>

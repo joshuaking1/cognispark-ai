@@ -16,7 +16,7 @@ interface UserProfileForVapi {
 }
 
 export default function VoiceCallPage() {
-  // Replace with your actual Vapi Assistant ID for Nova
+  // Replace with your actual Vapi Assistant ID for Learnbridge AI
   const NOVA_VAPI_ASSISTANT_ID = process.env.NEXT_PUBLIC_NOVA_VAPI_ASSISTANT_ID || "YOUR_ASSISTANT_ID_FALLBACK";
   // ^^^ Consider putting this in .env.local as NEXT_PUBLIC_NOVA_VAPI_ASSISTANT_ID
 
@@ -62,7 +62,7 @@ export default function VoiceCallPage() {
     return (
         <div className="container mx-auto py-10 text-center">
             <h1 className="text-2xl font-bold text-destructive">Voice Call Configuration Error</h1>
-            <p className="mt-4 text-muted-foreground">The Vapi Assistant ID for Nova is not set up correctly.</p>
+            <p className="mt-4 text-muted-foreground">The Vapi Assistant ID for Learnbridge AI is not set up correctly.</p>
             <p className="text-xs mt-2">Please set NEXT_PUBLIC_NOVA_VAPI_ASSISTANT_ID in your environment variables.</p>
             <Button asChild className="mt-6"><Link href="/dashboard">Back to Dashboard</Link></Button>
         </div>
@@ -73,7 +73,7 @@ export default function VoiceCallPage() {
   return (
     <div className="container mx-auto py-10 flex flex-col items-center gap-8">
       <div>
-        <h1 className="text-3xl font-bold text-center">Real-Time Voice Call with Nova</h1>
+        <h1 className="text-3xl font-bold text-center">Real-Time Voice Call with Learnbridge AI</h1>
         <p className="mt-2 text-muted-foreground text-center max-w-md">
           Experience a natural, interruptible conversation with your AI tutor. Just click start and begin talking!
         </p>

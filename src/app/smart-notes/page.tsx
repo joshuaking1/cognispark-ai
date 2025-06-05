@@ -34,7 +34,7 @@ export default function SmartNotesPage() {
   const tourSteps: Step[] = [
     {
       target: ".smart-notes-page",
-      content: "Welcome to Nova's Smart Notes! This tool helps you summarize and organize your study materials.",
+      content: "Welcome to Learnbridge AI's Smart Notes! This tool helps you summarize and organize your study materials.",
       disableBeacon: true,
       placement: "center"
     },
@@ -50,7 +50,7 @@ export default function SmartNotesPage() {
     },
     {
       target: ".summarize-button",
-      content: "Click here to generate your AI-powered summary. Nova will identify and extract the key points.",
+      content: "Click here to generate your AI-powered summary. Learnbridge AI will identify and extract the key points.",
       placement: "right"
     },
     {
@@ -176,7 +176,7 @@ export default function SmartNotesPage() {
               AI Text Summarizer
             </CardTitle>
             <CardDescription className="text-base md:text-lg text-slate-600 dark:text-slate-400 text-center max-w-3xl mx-auto">
-              Paste your text below, choose a summary length, and let Nova create intelligent summaries for you.
+              Paste your text below, choose a summary length, and let Learnbridge AI create intelligent summaries for you.
             </CardDescription>
           </CardHeader>
           

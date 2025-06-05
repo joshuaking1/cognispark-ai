@@ -155,8 +155,8 @@ export default function ManageTipsPage() {
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">{snippet.content.substring(0,100)}{snippet.content.length > 100 && "..."}</p>
                 {snippet.link_url && <a href={snippet.link_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">Learn More</a>}
                 <div className="mt-2 flex gap-2">
-                  <Button size="xs" variant="outline" onClick={() => handleEdit(snippet)}><Edit2 className="mr-1 h-3 w-3"/>Edit</Button>
-                  <Button size="xs" variant="destructive-outline" onClick={() => handleDelete(snippet.id)}><Trash2 className="mr-1 h-3 w-3"/>Delete</Button>
+                  <Button size="sm" variant="outline" onClick={() => handleEdit(snippet)}><Edit2 className="mr-1 h-3 w-3"/>Edit</Button>
+                  <Button size="sm" variant="destructive-outline" onClick={() => handleDelete(snippet.id)}><Trash2 className="mr-1 h-3 w-3"/>Delete</Button>
                 </div>
               </div>
             ))}

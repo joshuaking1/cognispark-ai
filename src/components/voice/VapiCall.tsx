@@ -98,7 +98,7 @@ export default function VapiCall({
         setCallDuration(prev => prev + 1);
       }, 1000);
       
-      toast.success("Call started", { description: "Connected to Nova successfully!" });
+      toast.success("Call started", { description: "Connected to Learnbridge AI successfully!" });
     };
 
     const onCallEnd = () => {
@@ -135,7 +135,7 @@ export default function VapiCall({
     
     const onMessage = (message: any) => {
       if (message.type === 'transcript' && message.transcriptType === 'final') {
-        const speaker = message.role === 'user' ? userName : 'Nova';
+        const speaker = message.role === 'user' ? userName : 'Learnbridge AI';
         const newTranscript: Transcript = {
           speaker,
           text: message.transcript,
@@ -275,7 +275,7 @@ export default function VapiCall({
 
         {/* Main Call Area */}
         <div className="flex-1 flex flex-col items-center justify-center px-8 text-center relative">
-          {/* Nova Avatar */}
+          {/* Learnbridge AI Avatar */}
           <div className="relative mb-8">
             <div className="absolute inset-0 bg-gradient-to-r from-[#fd6a3e] to-orange-400 rounded-full blur-3xl opacity-30 animate-pulse" />
             <div className="relative w-40 h-40 bg-gradient-to-br from-[#fd6a3e] to-orange-500 rounded-full shadow-2xl flex items-center justify-center">
@@ -290,7 +290,7 @@ export default function VapiCall({
 
           {/* Call Info */}
           <div className="text-white space-y-2 mb-8">
-            <h2 className="text-3xl font-bold">Nova AI</h2>
+            <h2 className="text-3xl font-bold">Learnbridge AI</h2>
             <p className="text-lg opacity-80">Your Learning Assistant</p>
             <div className="flex items-center justify-center gap-2 text-sm opacity-70">
               <Clock className="h-4 w-4" />
@@ -377,7 +377,7 @@ export default function VapiCall({
           </div>
           
           <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white">
-            Voice Call with Nova
+            Voice Call with Learnbridge AI
           </CardTitle>
           
           <CardDescription className="text-base mt-2 text-gray-600 dark:text-gray-300">
@@ -415,7 +415,7 @@ export default function VapiCall({
               {isLoading ? (
                 <>
                   <Loader2 className="mr-3 h-6 w-6 animate-spin" />
-                  <span>Connecting to Nova...</span>
+                  <span>Connecting to Learnbridge AI...</span>
                 </>
               ) : (
                 <>
@@ -467,8 +467,8 @@ export default function VapiCall({
                   <div key={index} className="space-y-2">
                     <div className="flex items-center gap-2">
                       <Badge 
-                        variant={transcript.speaker === 'Nova' ? 'default' : 'secondary'}
-                        className={transcript.speaker === 'Nova' 
+                        variant={transcript.speaker === 'Learnbridge AI' ? 'default' : 'secondary'}
+                        className={transcript.speaker === 'Learnbridge AI' 
                           ? 'bg-gradient-to-r from-[#fd6a3e] to-[#022e7d] text-white' 
                           : 'bg-gray-200 text-gray-700'
                         }

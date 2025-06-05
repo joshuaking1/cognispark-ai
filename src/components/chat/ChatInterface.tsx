@@ -268,10 +268,10 @@ export default function ChatInterface() {
         const audioBlob = await response.blob(); const audioUrl = URL.createObjectURL(audioBlob);
         if (!audioRef.current) { audioRef.current = new Audio(); }
         const audio = audioRef.current; audio.src = audioUrl;
-        audio.play().catch(e => { console.error("Audio play error:", e); toast.error("Playback Error", { description: "Could not play Nova's voice. Check audio settings."}); setIsSpeaking(false); URL.revokeObjectURL(audioUrl); });
+        audio.play().catch(e => { console.error("Audio play error:", e); toast.error("Playback Error", { description: "Could not play Learnbridge's voice. Check audio settings."}); setIsSpeaking(false); URL.revokeObjectURL(audioUrl); });
         audio.onended = () => { setIsSpeaking(false); URL.revokeObjectURL(audioUrl); };
-        audio.onerror = (e) => { console.error("Audio element error:", e); toast.error("Audio Error", { description: "Error with Nova's voice playback."}); setIsSpeaking(false); URL.revokeObjectURL(audioUrl); };
-    } catch (error: any) { console.error("playNovaResponse error:", error); toast.error("TTS Failed", { description: error.message || "Could not generate Nova's voice."}); setIsSpeaking(false); }
+        audio.onerror = (e) => { console.error("Audio element error:", e); toast.error("Audio Error", { description: "Error with Learnbridge's voice playback."}); setIsSpeaking(false); URL.revokeObjectURL(audioUrl); };
+    } catch (error: any) { console.error("playNovaResponse error:", error); toast.error("TTS Failed", { description: error.message || "Could not generate Learnbridge AI's voice."}); setIsSpeaking(false); }
   };
   const toggleTTS = () => { 
     setIsTTSEnabled(prev => {
@@ -280,7 +280,7 @@ export default function ChatInterface() {
         audioRef.current.pause(); if(audioRef.current.src.startsWith('blob:')) URL.revokeObjectURL(audioRef.current.src);
         audioRef.current.src = ""; setIsSpeaking(false);
       }
-      toast.info(newState ? "Nova's voice enabled" : "Nova's voice disabled"); return newState;
+      toast.info(newState ? "Learnbridge AI's voice enabled" : "Learnbridge AI's voice disabled"); return newState;
     });
   };
   useEffect(() => { 
@@ -444,7 +444,7 @@ export default function ChatInterface() {
                 <div key={msg.id} className={`flex gap-3 mb-5 ${msg.role === "user" ? "justify-end" : "items-start"}`}>
                   {msg.role !== "user" && (
                     <Avatar className="h-8 w-8 md:h-9 md:w-9 flex-shrink-0 shadow-sm">
-                      <AvatarImage src="/nova-avatar.png" alt="Nova" />
+                      <AvatarImage src="/learnbridge-ai-avatar.png" alt="Learnbridge AI" />
                       <AvatarFallback className={`bg-[${BRAND_ORANGE}] text-white font-medium text-sm`}>N</AvatarFallback>
                     </Avatar>
                   )}
@@ -481,7 +481,7 @@ export default function ChatInterface() {
               {chatIsLoading && messages[messages.length - 1]?.role === 'user' && (
                 <div className="flex items-start gap-3 mb-5">
                   <Avatar className="h-8 w-8 md:h-9 md:w-9 flex-shrink-0 shadow-sm">
-                    <AvatarImage src="/nova-avatar.png" alt="Nova" />
+                    <AvatarImage src="/learnbridge-ai-avatar.png" alt="Learnbridge AI" />
                     <AvatarFallback className={`bg-[${BRAND_ORANGE}] text-white font-medium text-sm`}>N</AvatarFallback>
                   </Avatar>
                   <div className="max-w-[85%] md:max-w-[75%] px-3.5 py-2.5 rounded-lg bg-white dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600/50 shadow-sm">

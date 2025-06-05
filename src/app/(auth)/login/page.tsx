@@ -53,31 +53,19 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-black/10" />
         
         <div className="relative z-20 flex items-center text-lg font-medium">
-          <div className="mr-3 p-2 rounded-lg bg-white/10 backdrop-blur-sm">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-6 w-6"
-            >
-              <path d="m8 3 4 8 5-5v11H5V11l3-8Z" />
-            </svg>
+          <div className="mr-3 p-2 rounded-lg">
+            <img src="/LearnBridge logo inverted2.png" alt="LearnBrigeEdu Logo" className="h-8 w-auto" />
           </div>
-          CogniSpark AI
         </div>
         
         <div className="relative z-20 mt-auto">
           <div className="p-8 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20">
             <blockquote className="space-y-4">
               <p className="text-lg leading-relaxed">
-                &ldquo;LearnBridge Edu has profoundly transformed our educational approach. The AI-generated lesson plans and real-time analytics have significantly reduced administrative burdens, allowing our teachers to dedicate more time to student engagement.&rdquo;
+                &ldquo;For the first time in history, an AI specifically trained on the Standards-Based Curriculum (SBC) is available to us. This novel tool is a timely, vital intervention that redefines lesson planning and execution, setting a new standard for academic excellence.​&rdquo;
               </p>
               <footer className="text-sm opacity-90 font-medium">
-                Dina Akosua Mintah - Head Mistress<br />
+              Diana Akosua Mintah - Head Mistress<br />
                 Ghana Senior High School
               </footer>
             </blockquote>
@@ -101,21 +89,8 @@ export default function LoginPage() {
           
           <CardHeader className="relative space-y-4 pb-8">
             <div className="flex justify-center mb-4">
-              <div className="p-4 rounded-full shadow-lg" style={{
-                background: `linear-gradient(135deg, #fd6a3e 0%, #022e7d 100%)`
-              }}>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="h-8 w-8 text-white"
-                >
-                  <path d="m8 3 4 8 5-5v11H5V11l3-8Z" />
-                </svg>
+              <div className="p-4 rounded-full shadow-lg bg-white">
+                <img src="/LearnBridge logo inverted2.png" alt="LearnBrigeEdu Logo" className="h-10 w-auto" />
               </div>
             </div>
             <CardTitle className="text-3xl font-bold text-center" style={{
@@ -127,7 +102,7 @@ export default function LoginPage() {
               Welcome back
             </CardTitle>
             <CardDescription className="text-center text-slate-600 text-base">
-              Sign in to your CogniSpark AI account
+              Sign in to your LearnBrigeEdu account
             </CardDescription>
           </CardHeader>
           

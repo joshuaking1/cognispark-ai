@@ -39,7 +39,7 @@ export default function HomePage() {
               </span>
             </div>
             <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-[#022e7d] via-[#fd6a3e] to-[#022e7d] bg-clip-text text-transparent">
-              Welcome to LearnBridgEdu CogniSpark AI
+              Welcome to LearnBridgEdu AI
             </h1>
             <p className="text-xl md:text-2xl text-slate-700 dark:text-slate-200 mb-8 max-w-3xl mx-auto">
               The next generation of personalized learning powered by advanced AI technology
@@ -90,7 +90,7 @@ export default function HomePage() {
               {
                 icon: <MessageSquare className="h-8 w-8 text-[#fd6a3e]" />,
                 title: "AI Chat Assistant",
-                description: "Get instant help and explanations from Nova, your personal AI tutor",
+                description: "Get instant help and explanations from LearnBridge, your personal AI tutor",
                 gradient: "from-[#fd6a3e]/10 to-[#ff8c69]/5"
               },
               {
@@ -159,15 +159,15 @@ export default function HomePage() {
               <CardContent className="p-8 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-[#fd6a3e]/10 to-[#022e7d]/10 rounded-full -translate-y-20 translate-x-20" />
                 <div className="flex items-center gap-4 mb-6 relative z-10">
-                  <div className="p-2 bg-gradient-to-br from-[#fd6a3e] to-[#ff8c69] rounded-lg">
-                    <Sparkles className="h-8 w-8 text-white" />
+                  <div className="p-2 bg-blue-200 rounded-lg">
+                    <img src="/LearnBridge logo inverted2.png" alt="LearnBrigeEdu Logo" className="h-10 w-auto" />
                   </div>
                   <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-[#022e7d] to-[#fd6a3e] bg-clip-text text-transparent">
                     Currently in Beta
                   </h2>
                 </div>
                 <p className="text-lg text-slate-600 dark:text-slate-300 mb-6 relative z-10">
-                  CogniSpark AI is currently in beta testing, offering early access to our revolutionary learning platform. 
+                  LearnBridgeEdu AI is currently in beta testing, offering early access to our revolutionary learning platform. 
                   As a beta user, you'll have the opportunity to shape the future of AI-powered education while enjoying 
                   exclusive features and benefits.
                 </p>
@@ -217,7 +217,7 @@ export default function HomePage() {
               Powered by LearnBridgeEdu
             </h2>
             <p className="text-lg text-blue-100 mb-8 max-w-3xl mx-auto">
-              CogniSpark AI is the latest innovation from LearnBridgeEdu, a pioneer in educational technology in Ghana. 
+              LearnBridge AI is the latest innovation from LearnBridgeEdu, a pioneer in educational technology in Ghana. 
               We've created a next-generation platform that leverages cutting-edge AI to deliver personalized learning experiences.
             </p>
             <Link href="/signup">

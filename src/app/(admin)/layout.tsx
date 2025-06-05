@@ -10,7 +10,7 @@ function AdminNavbar() {
     return (
         <nav className="bg-gray-800 text-white p-4 shadow-md">
             <div className="container mx-auto flex justify-between items-center">
-                <Link href="/admin" className="text-xl font-bold">CogniSpark Admin</Link>
+                <Link href="/admin" className="text-xl font-bold">LearnBrigeEdu Admin</Link>
                 <div>
                     {/* Add admin-specific nav links here if needed */}
                     <Link href="/" className="text-sm hover:text-gray-300 mr-4">Go to Main App</Link>
@@ -51,7 +51,7 @@ export default async function AdminLayout({ children }: PropsWithChildren) {
         {children}
       </main>
       <footer className="text-center p-4 text-xs text-gray-500 border-t">
-        CogniSpark AI Admin Panel
+        LearnBrigeEdu Admin Panel
       </footer>
     </div>
   );

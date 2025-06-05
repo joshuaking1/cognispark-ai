@@ -299,7 +299,7 @@ export async function uploadAvatarAction(
     const uploadResult = await new Promise<UploadApiResponse | undefined>((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
-          folder: `cognispark_ai/avatars/${user.id}`,
+          folder: `learnbrige_edu/avatars/${user.id}`,
           overwrite: true,
           resource_type: "image"
         },

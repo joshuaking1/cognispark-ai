@@ -42,7 +42,7 @@ export default function PhotoSolverPage() {
   const tourSteps: Step[] = [
     {
       target: ".photo-solver-page",
-      content: "Welcome to Nova's Photo Solver! This tool helps you solve math problems, science questions, and more from images.",
+      content: "Welcome to Learnbridge AI's Photo Solver! This tool helps you solve math problems, science questions, and more from images.",
       disableBeacon: true,
       placement: "center"
     },
@@ -256,7 +256,7 @@ Your step-by-step explanation or clarifying questions:`;
         </div>
         <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4">
           <span className="bg-gradient-to-r from-[#022e7d] via-[#fd6a3e] to-[#022e7d] bg-clip-text text-transparent">
-            Nova's Photo Problem Solver
+            Learnbridge AI's Photo Problem Solver
           </span>
         </h1>
         <p className="text-lg md:text-xl text-slate-600 dark:text-slate-300 max-w-2xl mx-auto leading-relaxed">

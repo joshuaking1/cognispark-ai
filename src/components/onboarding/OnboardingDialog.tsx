@@ -197,7 +197,7 @@ export default function OnboardingDialog({ open, onOpenChange, onComplete }: Onb
 
       if (error) throw error;
 
-      toast.success("Welcome to CogniSpark AI! Your profile has been set up successfully.");
+      toast.success("Welcome to LearnBrigeEdu! Your profile has been set up successfully.");
       
       await onComplete({
         full_name: formData.full_name,
@@ -233,12 +233,12 @@ export default function OnboardingDialog({ open, onOpenChange, onComplete }: Onb
           >
             <div className="flex justify-center mb-6">
               <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center shadow-lg">
-                <Sparkles className="w-10 h-10 text-white" />
+                <img src="/LearnBridge logo inverted2.png" alt="LearnBrigeEdu Logo" className="h-12 w-auto" />
               </div>
             </div>
             <div className="space-y-4">
               <DialogTitle className="text-2xl font-bold">
-                Welcome to LearnBridgEdu CogniSpark AI!
+                Welcome to LearnBrigeEdu!
               </DialogTitle>
               <DialogDescription className="text-base leading-relaxed">
                 Let's personalize your learning experience. We'll ask you a few questions to better understand your needs and create a tailored learning journey just for you.

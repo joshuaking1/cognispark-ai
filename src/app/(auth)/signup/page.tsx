@@ -76,10 +76,9 @@ export default function SignUpPage() {
         
         {/* Logo and Brand */}
         <div className="relative z-20 flex items-center text-xl font-bold">
-          <div className="mr-3 p-2 bg-gradient-to-br from-[#fd6a3e] to-[#f97316] rounded-xl shadow-lg">
-            <Brain className="h-6 w-6 text-white" />
+          <div className="mr-3 p-2 bg-white rounded-xl shadow-lg">
+            <img src="/LearnBridge logo inverted2.png" alt="LearnBrigeEdu Logo" className="h-8 w-auto" />
           </div>
-          CogniSpark AI
         </div>
         
         {/* Features */}
@@ -91,7 +90,7 @@ export default function SignUpPage() {
             <div className="space-y-4">
               <div className="flex items-center gap-4">
                 <div className="p-2 bg-[#fd6a3e]/20 rounded-lg">
-                  <Sparkles className="h-5 w-5 text-[#fd6a3e]" />
+                  <Sparkles className="h-8 w-8 mr-2 text-[#fd6a3e]" />
                 </div>
                 <span className="text-lg">AI-Generated Content</span>
               </div>
@@ -116,7 +115,7 @@ export default function SignUpPage() {
           <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
             <blockquote className="space-y-4">
               <p className="text-base leading-relaxed">
-                &ldquo;CogniSpark AI revolutionized my study routine. The AI-powered flashcards adapt to my learning pace, making complex topics easier to master. I've improved my retention by 300%!&rdquo;
+                &ldquo;LearnBrigeEdu revolutionized my study routine. The AI-powered flashcards adapt to my learning pace, making complex topics easier to master. I've improved my retention by 300%!&rdquo;
               </p>
               <footer className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-[#fd6a3e] to-[#f97316] rounded-full flex items-center justify-center">
@@ -155,7 +154,7 @@ export default function SignUpPage() {
             {/* Title */}
             <div className="text-center space-y-3">
               <CardTitle className="text-3xl font-bold bg-gradient-to-r from-[#022e7d] to-[#1e40af] bg-clip-text text-transparent">
-                Join CogniSpark AI
+                Join LearnBrigeEdu
               </CardTitle>
               <CardDescription className="text-gray-600 text-base leading-relaxed">
                 Create your account and unlock the power of AI-driven learning
@@ -282,7 +281,7 @@ export default function SignUpPage() {
               <div className="p-1 bg-gradient-to-br from-[#fd6a3e] to-[#f97316] rounded-lg">
                 <Brain className="h-4 w-4 text-white" />
               </div>
-              <span className="font-bold text-[#022e7d]">CogniSpark AI</span>
+              <span className="font-bold text-[#022e7d]">LearnBrigeEdu</span>
             </div>
             <p className="text-xs text-gray-600">Transform your learning with AI-powered flashcards</p>
           </div>

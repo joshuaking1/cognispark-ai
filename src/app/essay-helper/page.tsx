@@ -295,7 +295,7 @@ export default function EssayHelperPage() {
       <Card className="w-full max-w-5xl mx-auto shadow-xl rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden essay-helper-card">
         <CardHeader className="border-b border-slate-200 dark:border-slate-700/80 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/80 dark:to-slate-900/70 p-5 md:p-6">
           <CardTitle className="text-2xl md:text-3xl font-bold flex items-center" style={{ color: BRAND_ORANGE}}>
-            <Sparkles className="mr-3 h-7 w-7 md:h-8 md:w-8" style={{color: BRAND_ORANGE}} /> <span className="text-slate-800 dark:text-slate-100">Nova's Essay Helper</span>
+            <img src="/LearnBridge logo inverted2.png" alt="LearnBrigeEdu Logo" className="mr-2 h-8 w-auto" /> <span className="text-slate-800 dark:text-slate-100">Learnbridge AI's Essay Helper</span>
           </CardTitle>
           <CardDescription className="text-sm md:text-base text-slate-600 dark:text-slate-400 mt-1.5">
             Craft compelling essays with AI-powered brainstorming, outlining, and feedback.

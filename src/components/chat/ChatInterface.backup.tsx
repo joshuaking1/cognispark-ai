@@ -107,18 +107,18 @@ interface Conversation {
 const chatTourSteps = [
   {
     target: '.chat-input-textarea',
-    content: 'Type your questions or messages to Nova here!',
+    content: 'Type your questions or messages to Learnbridge AI here!',
     placement: 'top',
     disableBeacon: true,
   },
   {
     target: '.voice-input-button',
-    content: 'Click here to use your voice to talk to Nova.',
+    content: 'Click here to use your voice to talk to Learnbridge AI.',
     placement: 'top',
   },
   {
     target: '.tts-toggle-button',
-    content: "Enable this to hear Nova's responses spoken aloud.",
+    content: "Enable this to hear Learnbridge AI's responses spoken aloud.",
     placement: 'bottom',
   },
   {
@@ -128,7 +128,7 @@ const chatTourSteps = [
   },
   {
     target: '.send-message-button',
-    content: 'Click this button to send your message to Nova.',
+    content: 'Click this button to send your message to Learnbridge AI.',
     placement: 'left',
   }
 ];
@@ -498,7 +498,7 @@ export default function ChatInterface() {
         .catch(e => {
             console.error("Audio play error:", e);
             toast.error("Playback Error", { 
-              description: "Could not play Nova's voice. Please check your browser's audio settings."
+              description: "Could not play Learnbridge AI's voice. Please check your browser's audio settings."
             });
             setIsSpeaking(false);
         });
@@ -510,7 +510,7 @@ export default function ChatInterface() {
       audio.onerror = (e) => {
         console.error("Audio element error:", e);
         toast.error("Audio Error", { 
-          description: "An error occurred with Nova's voice playback. Please try again."
+          description: "An error occurred with Learnbridge AI's voice playback. Please try again."
         });
         setIsSpeaking(false);
         URL.revokeObjectURL(audioUrl); // Clean up
@@ -519,7 +519,7 @@ export default function ChatInterface() {
     } catch (error: any) {
       console.error("playNovaResponse error:", error);
       toast.error("TTS Failed", { 
-        description: error.message || "Could not generate Nova's voice. Please try again."
+        description: error.message || "Could not generate Learnbridge AI's voice. Please try again."
       });
       setIsSpeaking(false);
     }
@@ -533,7 +533,7 @@ export default function ChatInterface() {
         audioRef.current.src = ""; // Detach source
         setIsSpeaking(false);
       }
-      toast.info(newState ? "Nova's premium voice enabled" : "Nova's voice disabled");
+      toast.info(newState ? "Learnbridge AI's premium voice enabled" : "Learnbridge AI's voice disabled");
       return newState;
     });
   };
@@ -612,7 +612,7 @@ export default function ChatInterface() {
                     <MessageSquare className="w-10 h-10 md:w-12 md:h-12 text-blue-600 dark:text-blue-400" />
                   </div>
                   <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-slate-100 mb-2 md:mb-3">
-                    {currentConversationId ? "This conversation is empty" : "Welcome to Nova AI!"}
+                    {currentConversationId ? "This conversation is empty" : "Welcome to Learnbridge AI!"}
                   </h2>
                   <p className="text-sm md:text-base text-slate-600 dark:text-slate-400 max-w-md leading-relaxed">
                     {currentConversationId 
@@ -630,7 +630,7 @@ export default function ChatInterface() {
                 >
                   {msg.role !== "user" && (
                     <Avatar className="h-10 w-10 md:h-12 md:w-12 flex-shrink-0 shadow-lg ring-2 ring-white dark:ring-slate-800">
-                      <AvatarImage src="/nova-avatar.png" alt="Nova" />
+                      <AvatarImage src="/learnbridge-ai-avatar.png" alt="Learnbridge AI" />
                       <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-500 text-white font-semibold">
                         N
                       </AvatarFallback>
@@ -686,7 +686,7 @@ export default function ChatInterface() {
               {chatIsLoading && messages[messages.length - 1]?.role === 'user' && (
                 <div className="flex gap-3 md:gap-4 mb-6 md:mb-8">
                   <Avatar className="h-10 w-10 md:h-12 md:w-12 flex-shrink-0 shadow-lg ring-2 ring-white dark:ring-slate-800">
-                    <AvatarImage src="/nova-avatar.png" alt="Nova" />
+                    <AvatarImage src="/learnbridge-ai-avatar.png" alt="Learnbridge AI" />
                     <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-500 text-white font-semibold">
                       N
                     </AvatarFallback>
@@ -698,7 +698,7 @@ export default function ChatInterface() {
                         <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
                         <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
                       </div>
-                      <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400">Nova is thinking...</p>
+                      <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400">Learnbridge AI is thinking...</p>
                     </div>
                   </div>
                 </div>
@@ -721,7 +721,7 @@ export default function ChatInterface() {
                 <Textarea
                   value={input}
                   onChange={handleInputChange}
-                  placeholder={isListening ? "Listening..." : "Ask Nova anything..."}
+                  placeholder={isListening ? "Listening..." : "Ask Learnbridge AI anything..."}
                   className="min-h-[50px] md:min-h-[60px] max-h-32 resize-none rounded-2xl bg-white/70 dark:bg-slate-800/70 backdrop-blur-sm border-slate-200/50 dark:border-slate-700/50 focus:border-blue-500/50 dark:focus:border-blue-400/50 px-4 md:px-6 py-3 md:py-4 pr-12 md:pr-16 text-sm md:text-base shadow-lg transition-all duration-200 chat-input-textarea"
                   rows={1}
                   onKeyDown={(e) => {

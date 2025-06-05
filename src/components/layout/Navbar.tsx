@@ -37,13 +37,13 @@ import {
 // Define navigation items
 const navItems = [
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/chat", label: "Chat with Nova" },
+  { href: "/chat", label: "Chat with Learnbridge AI" },
   { href: "/smart-notes", label: "Smart Notes" },
   { href: "/essay-helper", label: "Essay Helper" },
   { href: "/photo-solver", label: "Photo Solver" },
   { href: "/flashcards", label: "Flashcards" },
   { href: "/quizzes", label: "Quizzes" },
-  { href: "/voice-call", label: "Voice Call Nova" },
+  { href: "/voice-call", label: "Voice Call Learnbridge AI" },
 ];
 
 export default function Navbar() {
@@ -116,12 +116,7 @@ export default function Navbar() {
       <header className="sticky top-0 z-50 w-full border-b border-slate-200/30 bg-white/90 backdrop-blur-xl supports-[backdrop-filter]:bg-white/90 dark:border-slate-700/40 dark:bg-slate-900/90 shadow-sm">
         <div className="container flex h-16 items-center">
           <Link href="/" className="mr-6 flex items-center space-x-2">
-            <div className="p-2 rounded-xl bg-gradient-to-br from-[#fd6a3e] via-[#ff8563] to-[#022e7d] shadow-lg">
-              <Sparkles className="h-5 w-5 text-white" />
-            </div>
-            <span className="font-bold text-lg bg-gradient-to-r from-[#022e7d] via-[#1a4ba6] to-[#fd6a3e] bg-clip-text text-transparent">
-              CogniSpark AI
-            </span>
+            <img src="/LearnBridge logo inverted2.png" alt="LearnBrigeEdu Logo" className="h-10" />
           </Link>
         </div>
       </header>
@@ -158,12 +153,7 @@ export default function Navbar() {
             href={user ? "/dashboard" : "/"}
             className="flex items-center space-x-3 group"
           >
-            <div className="p-2 rounded-xl bg-gradient-to-br from-[#fd6a3e] via-[#ff8563] to-[#022e7d] group-hover:shadow-lg group-hover:shadow-[#fd6a3e]/30 transition-all duration-300 group-hover:scale-110">
-              <Sparkles className="h-5 w-5 text-white" />
-            </div>
-            <span className="font-bold text-lg bg-gradient-to-r from-[#022e7d] via-[#1a4ba6] to-[#fd6a3e] bg-clip-text text-transparent hidden sm:inline-block group-hover:from-[#fd6a3e] group-hover:to-[#022e7d] transition-all duration-500">
-              CogniSpark AI
-            </span>
+            <img src="/LearnBridge logo inverted2.png" alt="LearnBrigeEdu Logo" className="h-10" />
           </Link>
 
           {/* Desktop Navigation */}

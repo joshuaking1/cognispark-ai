@@ -37,7 +37,7 @@ export default function LearningPlanGenerator({ onPlanGenerated, initialGoal = "
   const handleGeneratePlan = async () => {
     if (!currentGoal.trim()) {
       toast.info("Optional Goal", { 
-        description: "No specific goal entered. Nova will generate a general plan based on your profile." 
+        description: "No specific goal entered. Learnbridge AI will generate a general plan based on your profile." 
       });
     }
     
@@ -74,7 +74,7 @@ export default function LearningPlanGenerator({ onPlanGenerated, initialGoal = "
           disabled={isLoading}
         />
         <p className="text-xs text-muted-foreground mt-1">
-          Nova will use this and your profile (grade, subjects) to suggest a plan.
+          Learnbridge AI will use this and your profile (grade, subjects) to suggest a plan.
         </p>
       </div>
       <Button 

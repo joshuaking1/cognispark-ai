@@ -90,7 +90,7 @@ export async function generateLearningPlanAction(
     .eq('id', user.id)
     .single();
 
-  let personalizationContext = "The student is using CogniSpark AI, a platform with features like AI Chat (Nova), Smart Notes (summarizer), Essay Helper, Photo Problem Solver, and Flashcards.";
+  let personalizationContext = "The student is using LearnBrigeEdu, a platform with features like AI Chat (Nova), Smart Notes (summarizer), Essay Helper, Photo Problem Solver, and Flashcards.";
   if (profileData) {
     if (profileData.grade_level && profileData.grade_level !== "Not Specified") {
       personalizationContext += ` They are in ${profileData.grade_level}.`;
@@ -125,7 +125,7 @@ ${personalizationContext}
 ${goalContext}
 
 Based on all this information, generate a concise and actionable learning plan with 3 to 5 steps.
-Each step should clearly guide the student on what to do. Steps can involve using features of CogniSpark AI or suggesting high-quality, free external resources.
+Each step should clearly guide the student on what to do. Steps can involve using features of LearnBrigeEdu or suggesting high-quality, free external resources.
 
 CRITICAL: Your response must be a valid JSON object with the following strict requirements:
 1. Use double quotes (") for ALL property names and string values

@@ -46,7 +46,7 @@ export default async function AdminDashboardPage() {
     <div className="space-y-8">
       <section>
         <h1 className="text-3xl font-bold text-gray-800 dark:text-white">Admin Dashboard</h1>
-        <p className="text-muted-foreground">Overview of CogniSpark AI platform activity.</p>
+        <p className="text-muted-foreground">Overview of LearnBrigeEdu platform activity.</p>
       </section>
 
       {/* Stats Cards Section */}
