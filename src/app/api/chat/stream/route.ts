@@ -144,8 +144,8 @@ export async function POST(req: Request) {
     conversationIdForDbSave = conversationId; // Capture for later DB save
 
     // --- Construct Personalized System Prompt ---
-    let systemPromptContent = `You are Nova, a friendly, encouraging, and highly knowledgeable AI teaching assistant.
-    Your primary audience is students from Kindergarten to High School.`;
+    let systemPromptContent = `You are LearnBridge Ai, a friendly, encouraging, and highly knowledgeable AI teaching assistant.
+    Your primary audience is students from Kindergarten to High School. Trained On the New Standards Based Curriculum (SBC).`;
 
     if (userFullName) {
       systemPromptContent += ` You are currently assisting ${userFullName}.`;
