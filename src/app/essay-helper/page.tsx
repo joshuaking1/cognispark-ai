@@ -88,7 +88,7 @@ export default function EssayHelperPage() {
   const tourSteps: Step[] = [
     {
       target: ".essay-helper-tabs",
-      content: "Welcome to Nova's Essay Helper! This tool has three main features to help with your essays.",
+      content: "Welcome to LearnBridge AI's Essay Helper! This tool has three main features to help with your essays.",
       disableBeacon: true,
       placement: "center"
     },
@@ -316,7 +316,7 @@ export default function EssayHelperPage() {
               <section className="space-y-6 p-5 md:p-6 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/70 shadow-sm brainstorm-inputs-section">
                 <h3 className="text-lg font-semibold flex items-center" style={{color: BRAND_BLUE}}>
                   <Lightbulb className="mr-2 h-5 w-5" style={{color: BRAND_ORANGE}} />
-                  <span className="dark:text-blue-300">Tell Nova About Your Essay</span>
+                  <span className="dark:text-blue-300">Tell LearnBridge AI About Your Essay</span>
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 items-start">
                   <div className="space-y-1.5">
@@ -551,7 +551,7 @@ export default function EssayHelperPage() {
           </Tabs>
         </CardContent>
         <CardFooter className="text-xs text-slate-500 dark:text-slate-400 text-center border-t border-slate-200 dark:border-slate-700/80 bg-slate-50 dark:bg-slate-800/50 p-4 md:p-5">
-          <p>Nova's Essay Helper provides suggestions. Always review and use your own critical thinking.</p>
+          <p>LearnBridge AI's Essay Helper provides suggestions. Always review and use your own critical thinking.</p>
         </CardFooter>
       </Card>
     </div>

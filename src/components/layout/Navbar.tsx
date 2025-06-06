@@ -116,7 +116,7 @@ export default function Navbar() {
       <header className="sticky top-0 z-50 w-full border-b border-slate-200/30 bg-white/90 backdrop-blur-xl supports-[backdrop-filter]:bg-white/90 dark:border-slate-700/40 dark:bg-slate-900/90 shadow-sm">
         <div className="container flex h-16 items-center">
           <Link href="/" className="mr-6 flex items-center space-x-2">
-            <img src="/LearnBridge logo inverted croped.png" alt="LearnBridge Logo" className="h-10" />
+            <img src="/LearnBridge logo inverted2.png" alt="LearnBridge Logo" className="h-12" />
           </Link>
         </div>
       </header>
@@ -153,7 +153,7 @@ export default function Navbar() {
             href={user ? "/dashboard" : "/"}
             className="flex items-center space-x-3 group"
           >
-            <img src="/LearnBridge logo inverted croped.png" alt="LearnBridge Logo" className="h-10" />
+            <img src="/LearnBridge logo inverted2.png" alt="LearnBridge Logo" className="h-12" />
           </Link>
 
           {/* Desktop Navigation */}

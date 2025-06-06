@@ -387,7 +387,7 @@ export default function ChatInterface() {
               </h2>
               <div className="flex items-center gap-2">
                   <Button 
-                      variant={isTTSEnabled ? "subtle" : "outline"}
+                      variant={isTTSEnabled ? "ghost" : "outline"}
                       style={isTTSEnabled ? { backgroundColor: `rgba(2, 46, 125, 0.1)`, color: BRAND_BLUE, borderColor: `rgba(2, 46, 125, 0.2)` } : {borderColor: "hsl(var(--border))"}}
                       size="icon" 
                       onClick={toggleTTS}
@@ -425,12 +425,12 @@ export default function ChatInterface() {
                     <MessageSquare className={`w-8 h-8 text-[${BRAND_ORANGE}]`} />
                   </div>
                   <h2 className="text-xl font-semibold text-neutral-700 dark:text-neutral-200 mb-2">
-                    {currentConversationId ? "Empty Conversation" : "How can I help you today?"}
+                    {currentConversationId ? "Empty Conversation" : "Want a breakdown of what’s expected in your course this term? Just ask!"}
                   </h2>
                   {/* Suggestion chips - example */}
                   {!currentConversationId && (
                     <div className="mt-4 flex flex-wrap justify-center gap-2">
-                        {["Explain quantum computing", "Recipe for banana bread", "Debug my Python code"].map(prompt => (
+                        {["Let’s explore your SBC learning goals.", "What do you want to start with?", "Learning can be fun—just type your question and let’s go!"].map(prompt => (
                             <Button key={prompt} variant="outline" size="sm" className="bg-white dark:bg-neutral-800 border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700" onClick={() => setInput(prompt)}>
                                 {prompt}
                             </Button>

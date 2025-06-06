@@ -7,7 +7,7 @@ import * as unpdf from 'https://esm.sh/unpdf@1.0.5';
 
 // --- Configuration ---
 // ✅ CHANGE THIS: Replace sentence-transformers model with a proper feature extraction model
-const EMBEDDING_MODEL_ID = 'thenlper/gte-large'; // Recommended by HuggingFace for embeddings
+const EMBEDDING_MODEL_ID = 'BAAI/bge-large-en-v1.5'; // Recommended by HuggingFace for embeddings
 const EMBEDDING_MODEL_API_URL = `https://api-inference.huggingface.co/models/${EMBEDDING_MODEL_ID}`;
 const PDF_CHUNK_SIZE = 1000;
 const PDF_CHUNK_OVERLAP = 100;
@@ -78,32 +78,28 @@ async function extractTextFromPdf(pdfBuffer: ArrayBuffer): Promise<string> {
     }
 }
 
-// ✅ WORKING: Fixed embedding generation function
+// ✅ FINAL AND DEFINITIVE VERSION
 async function generateEmbedding(text: string, hfToken: string, retries = MAX_RETRIES): Promise<number[] | null> {
     for (let attempt = 1; attempt <= retries; attempt++) {
         try {
             console.log(`Generating embedding (attempt ${attempt}/${retries}) for model: ${EMBEDDING_MODEL_ID}`);
             
-            // Clean the text to avoid issues
             const cleanText = text.replace(/\s+/g, ' ').trim();
             if (cleanText.length === 0) {
                 console.warn("Empty text provided for embedding generation");
                 return null;
             }
             
-            // The model is configured as a sentence similarity pipeline, so we need to provide the expected format
             const response = await fetch(`https://api-inference.huggingface.co/models/${EMBEDDING_MODEL_ID}`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${hfToken}`,
                     'Content-Type': 'application/json',
                 },
+                // --- 2. USE THE CORRECT PAYLOAD FOR FEATURE-EXTRACTION ---
+                // Pass the input as an array with one item. This is the standard for this task.
                 body: JSON.stringify({ 
-                    // Format for sentence similarity pipeline
-                    inputs: {
-                        source_sentence: cleanText,
-                        sentences: [cleanText] // This satisfies the sentence similarity requirement
-                    },
+                    inputs: [cleanText],
                     options: { 
                         wait_for_model: true,
                         use_cache: false 
@@ -114,74 +110,35 @@ async function generateEmbedding(text: string, hfToken: string, retries = MAX_RE
             if (!response.ok) {
                 const errorBody = await response.text();
                 console.error(`Hugging Face API Error (${response.status}): ${errorBody}`);
-                
-                // Handle specific error cases
-                if (response.status === 503 && attempt < retries) {
-                    console.log(`Model loading (503), waiting ${RETRY_DELAY}ms before retry...`);
-                    await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
-                    continue;
-                }
-                
-                if (response.status === 403) {
-                    throw new Error(`Authentication error: Check your HUGGINGFACE_API_TOKEN permissions. Error: ${errorBody}`);
-                }
-                
-                if (response.status === 404) {
-                    throw new Error(`Model not found: ${EMBEDDING_MODEL_ID} may not be available via the inference API. Error: ${errorBody}`);
-                }
-                
-                if (response.status === 429) {
-                    console.log(`Rate limited (429), waiting ${RETRY_DELAY * 2}ms before retry...`);
-                    await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * 2));
-                    continue;
-                }
-                
+                // This specific model should not produce the sentence-similarity error.
+                // If it does, something is very wrong with the API itself.
                 throw new Error(`API request failed (${response.status}): ${errorBody}`);
             }
 
             const embeddingResponse = await response.json();
-            console.log("Raw embedding response type:", typeof embeddingResponse);
-            console.log("Raw embedding response sample:", JSON.stringify(embeddingResponse).substring(0, 200));
             
-            // ✅ HANDLE: Feature extraction response format
+            // The API returns an array of embeddings for batch requests: [[...embedding...]]
             let embedding: number[] | null = null;
             
-            if (Array.isArray(embeddingResponse)) {
-                if (Array.isArray(embeddingResponse[0]) && typeof embeddingResponse[0][0] === 'number') {
-                    embedding = embeddingResponse[0]; // Most common: [[values]]
-                } else if (typeof embeddingResponse[0] === 'number') {
-                    embedding = embeddingResponse; // Sometimes: [values]
-                }
+            if (Array.isArray(embeddingResponse) && Array.isArray(embeddingResponse[0])) {
+                embedding = embeddingResponse[0]; // Get the first (and only) embedding
             }
             
             if (!embedding || !Array.isArray(embedding)) {
                 console.error("Unexpected embedding response structure:", embeddingResponse);
-                console.error("Expected array format, got:", typeof embedding);
-                return null;
-            }
-            
-            // Validate embedding
-            if (embedding.some(val => typeof val !== 'number' || isNaN(val))) {
-                console.error("Invalid embedding values detected");
                 return null;
             }
             
             console.log(`Successfully generated embedding with ${embedding.length} dimensions`);
-            if (embedding.length !== EMBEDDING_DIMENSION) {
-                console.log(`Note: Got ${embedding.length} dimensions, expected ${EMBEDDING_DIMENSION}. This may be normal.`);
-            }
             
             return embedding;
             
         } catch (error: any) {
             console.error(`Error generating embedding (attempt ${attempt}):`, error.message);
-            
             if (attempt === retries) {
                 console.error('Max retries reached, giving up');
                 return null;
             }
-            
-            console.log(`Waiting ${RETRY_DELAY}ms before retry...`);
             await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
         }
     }
@@ -190,24 +147,16 @@ async function generateEmbedding(text: string, hfToken: string, retries = MAX_RE
 }
 
 serve(async (req: Request) => {
-    console.log("process-knowledge-pdf Edge Function invoked.");
-  
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     const huggingFaceToken = Deno.env.get('HUGGINGFACE_API_TOKEN');
-  
+
     if (!supabaseUrl || !serviceRoleKey || !huggingFaceToken) {
         return new Response(JSON.stringify({
             error: "Missing required environment variables. Please configure SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, and HUGGINGFACE_API_TOKEN."
         }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
-  
-    // ✅ Added: More detailed environment check
-    console.log("Environment check passed.");
-    console.log("Using model:", EMBEDDING_MODEL_ID);
-    console.log("API URL:", EMBEDDING_MODEL_API_URL);
-    console.log("HF Token length:", huggingFaceToken.length);
-  
+    
     const supabaseAdminClient = createClient(supabaseUrl, serviceRoleKey);
   
     let documentId: string = "unknown_doc";
@@ -223,6 +172,24 @@ serve(async (req: Request) => {
         }
         console.log(`Processing PDF: documentId=${documentId}, storagePath=${storagePath}`);
 
+        // ✅ Step 1: Fetch the uploaded_by ID associated with the document
+        // This is crucial for satisfying the foreign key constraint.
+        const { data: documentData, error: docError } = await supabaseAdminClient
+            .from('knowledge_documents')
+            .select('uploaded_by')
+            .eq('id', documentId)
+            .single();
+
+        if (docError) {
+            throw new Error(`Could not find document ${documentId}: ${docError.message}`);
+        }
+        if (!documentData || !documentData.uploaded_by) {
+            throw new Error(`Document ${documentId} does not have an uploaded_by ID associated with it.`);
+        }
+
+        const uploadedById = documentData.uploaded_by;
+        console.log(`Document was uploaded by user: ${uploadedById}`);
+        
         // Update document status to "processing"
         await supabaseAdminClient.from('knowledge_documents').update({ 
             status: 'processing', 
@@ -254,7 +221,7 @@ serve(async (req: Request) => {
             throw new Error("Failed to split PDF text into manageable chunks.");
         }
         console.log(`Text split into ${textChunks.length} chunks. Generating embeddings...`);
-
+        
         // 4. Generate embeddings for each chunk and prepare for DB insert
         const chunksToInsert = [];
         let processedChunksCount = 0;
@@ -268,6 +235,8 @@ serve(async (req: Request) => {
             
             if (embedding && embedding.length > 0) {
                 chunksToInsert.push({
+                    // ✅ Step 2: Include the user_id in the chunk data
+                    user_id: uploadedById,
                     document_id: documentId,
                     chunk_text: chunk,
                     embedding: embedding,
@@ -275,7 +244,7 @@ serve(async (req: Request) => {
                         source_document_id: documentId, 
                         chunk_index: i,
                         model_used: EMBEDDING_MODEL_ID,
-                        embedding_dimension: embedding.length
+                        embedding_dimension: embedding.length // ✅ Use actual embedding length
                     }
                 });
                 processedChunksCount++;
@@ -285,8 +254,8 @@ serve(async (req: Request) => {
                 failedChunksCount++;
             }
             
-            // ✅ Improved: More generous rate limiting to avoid 429 errors
-            if ((i + 1) % 2 === 0) {
+            // Rate limiting
+            if ((i + 1) % 2 === 0) { // Consider adjusting this based on API limits
                 console.log("Rate limiting: waiting 1.5s...");
                 await new Promise(resolve => setTimeout(resolve, 1500)); 
             }
@@ -300,15 +269,17 @@ serve(async (req: Request) => {
         console.log(`${chunksToInsert.length} chunks with embeddings ready for DB.`);
 
         // 5. Save chunks and embeddings to `document_chunks` table (batch insert)
+        // The insert will now succeed because `user_id` is present.
         const { error: insertChunksError } = await supabaseAdminClient
             .from('document_chunks')
             .insert(chunksToInsert);
 
         if (insertChunksError) {
+            // Re-throw with a more specific message if it fails
             throw new Error(`Failed to save document chunks to database: ${insertChunksError.message}`);
         }
         console.log(`Successfully inserted ${chunksToInsert.length} chunks into DB for document ${documentId}.`);
-
+        
         // 6. Update document status to "processed"
         await supabaseAdminClient.from('knowledge_documents')
             .update({ 
@@ -340,7 +311,7 @@ serve(async (req: Request) => {
             await supabaseAdminClient.from('knowledge_documents')
                 .update({ 
                     status: 'error', 
-                    error_message: error.message.substring(0, 500), 
+                    error_message: error.message.substring(0, 500), // Truncate error message
                     processed_at: new Date().toISOString() 
                 })
                 .eq('id', documentId);

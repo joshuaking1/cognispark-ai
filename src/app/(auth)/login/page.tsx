@@ -47,24 +47,33 @@ export default function LoginPage() {
   return (
     <div className="container relative h-screen flex-col items-center justify-center grid lg:max-w-none lg:grid-cols-2 lg:px-0">
       <div className="relative hidden h-full flex-col p-10 text-white lg:flex dark:border-r">
+        {/* Background Image Layer (Bottom) */}
         <div className="absolute inset-0" style={{
-          background: `linear-gradient(135deg, #022e7d 0%, #1e40af 70%, #2563eb 100%)`
+            backgroundImage: `url(/PIC.jpg)`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            zIndex: 0 
         }} />
-        <div className="absolute inset-0 bg-black/10" />
+
+        {/* Semi-transparent Blue Gradient Layer (Middle) */}
+        <div className="absolute inset-0" style={{
+            background: `linear-gradient(135deg, rgba(2, 46, 125, 0.9) 0%, rgba(30, 64, 175, 0.85) 70%, rgba(37, 99, 235, 0.8) 100%)`,
+            zIndex: 1 
+        }} />
         
         <div className="relative z-20 flex items-center text-lg font-medium">
           <div className="mr-3 p-2 rounded-lg">
-            <img src="/LearnBridge logo inverted croped.png" alt="LearnBridge Logo" className="h-10 w-auto" />
+            <img src="/LearnBridge logo inverted croped.png" alt="LearnBridge Logo" className="h-14 w-auto" />
           </div>
         </div>
         
         <div className="relative z-20 mt-auto">
-          <div className="p-8 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20">
+          <div className="p-6 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20">
             <blockquote className="space-y-4">
-              <p className="text-lg leading-relaxed">
+              <p className="text-base leading-relaxed">
                 &ldquo;For the first time in history, an AI specifically trained on the Standards-Based Curriculum (SBC) is available to us. This novel tool is a timely, vital intervention that redefines lesson planning and execution, setting a new standard for academic excellence.​&rdquo;
               </p>
-              <footer className="text-sm opacity-90 font-medium">
+              <footer className="text-xs opacity-90 font-medium">
               Diana Akosua Mintah - Head Mistress<br />
                 Ghana Senior High School
               </footer>
@@ -88,17 +97,12 @@ export default function LoginPage() {
           }} />
           
           <CardHeader className="relative space-y-4 pb-8">
-            <div className="flex justify-center mb-4">
+            <div className="flex justify-center mb-2">
               <div className="p-4 rounded-full shadow-lg bg-white">
-                <img src="/LearnBridge logo inverted croped.png" alt="LearnBridge Logo" className="h-12 w-auto" />
+                <img src="/LearnBridge icon white.png" alt="LearnBridge Logo" className="h-12 w-auto" />
               </div>
             </div>
-            <CardTitle className="text-3xl font-bold text-center" style={{
-              background: `linear-gradient(135deg, #022e7d 0%, #fd6a3e 100%)`,
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text'
-            }}>
+            <CardTitle className="text-3xl font-bold text-center" style={{ color: '#fd6a3e' }}>
               Welcome back
             </CardTitle>
             <CardDescription className="text-center text-slate-600 text-base">

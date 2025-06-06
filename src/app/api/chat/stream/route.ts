@@ -9,6 +9,49 @@ import Groq from "groq-sdk";
 import { createSupabaseRouteHandlerClient } from "@/lib/supabase/routeHandler";
 import { cookies } from "next/headers";
 
+const HF_TOKEN = process.env.HUGGINGFACE_API_TOKEN;
+const EMBEDDING_MODEL_API_URL_CHAT = 'https://api-inference.huggingface.co/models/BAAI/bge-large-en-v1.5';
+const EMBEDDING_DIMENSION_CHAT = 1024;
+
+async function generateQueryEmbedding(text: string): Promise<number[] | null> {
+  if (!HF_TOKEN) {
+    console.error("Chat RAG: Hugging Face API token not configured.");
+    return null;
+  }
+  try {
+    console.log('Chat RAG: Generating embedding for text:', text);
+    const response = await fetch(EMBEDDING_MODEL_API_URL_CHAT, {
+      method: 'POST',
+      headers: { 
+        'Authorization': `Bearer ${HF_TOKEN}`, 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({ inputs: [text] }),
+    });
+    
+    if (!response.ok) {
+      console.error('Chat RAG: Error generating embedding:', await response.text());
+      return null;
+    }
+    
+    const embeddingResponse = await response.json();
+    console.log('Chat RAG: Received embedding response:', embeddingResponse);
+    
+    if (embeddingResponse && Array.isArray(embeddingResponse.embeddings) && 
+        Array.isArray(embeddingResponse.embeddings[0]) && 
+        typeof embeddingResponse.embeddings[0][0] === 'number') {
+      return embeddingResponse.embeddings[0];
+    }
+    
+    console.error('Chat RAG: Invalid embedding response format:', embeddingResponse);
+    return null;
+  } catch (error) {
+    console.error('Chat RAG: Error generating query embedding:', error);
+    return null;
+  }
+}
+
 const groqApiKey = process.env.GROQ_API_KEY;
 
 if (!groqApiKey) {
@@ -106,6 +149,7 @@ export async function POST(req: Request) {
   let userMessageContentForDbSave: string | null = null;
 
   try {
+    const cookieStore = await cookies(); // Get cookies async first
     const supabase = createSupabaseRouteHandlerClient(); // For auth
     const {
       data: { user },
@@ -143,9 +187,14 @@ export async function POST(req: Request) {
     const conversationId = currentConversationId || crypto.randomUUID();
     conversationIdForDbSave = conversationId; // Capture for later DB save
 
-    // --- Construct Personalized System Prompt ---
-    let systemPromptContent = `You are LearnBridge Ai, a friendly, encouraging, and highly knowledgeable AI teaching assistant.
+    // --- Construct Personalized System Prompt with RAG context ---
+    const now = new Date();
+    const timeString = now.toLocaleString();
+
+    const basePrompt = `You are LearnBridge AI, a friendly, encouraging, and highly knowledgeable AI teaching assistant.
     Your primary audience is students from Kindergarten to High School. Trained On the New Standards Based Curriculum (SBC). respond with this or something around this. when starting a new conversation Hi there! 👋 Welcome to LearnBridge Edu—your space to explore, learn, and grow with confidence! Whether you're brushing up on Math, diving into Science, unlocking creativity, or tackling your next project, I'm here to guide you through the GES-Standard Based Curriculum journey in fun and exciting ways. What would you like to learn today?`;
+
+    let systemPromptContent = basePrompt;
 
     if (userFullName) {
       systemPromptContent += ` You are currently assisting ${userFullName}.`;
@@ -165,38 +214,86 @@ export async function POST(req: Request) {
       systemPromptContent += ` The student has expressed interest in the following subjects: ${userSubjectsOfInterest.join(", ")}. If relevant and natural, try to connect concepts or provide examples related to these subjects.`;
     }
 
-    // Add current time and timezone
-    const now = new Date();
-    const timeString = now.toLocaleString();
+    // --- RAG Step 1: Generate embedding for the latest user query ---
+    const latestUserQuery = clientMessages.findLast((msg: VercelAIMessage) => msg.role === 'user')?.content;
+    let retrievedContext = ""; // To store relevant chunks from knowledge base
+
+    if (latestUserQuery) {
+      const queryEmbedding = await generateQueryEmbedding(latestUserQuery);
+
+      if (queryEmbedding && queryEmbedding.length === EMBEDDING_DIMENSION_CHAT) {
+        // --- RAG Step 2: Call the Supabase DB function to find relevant chunks ---
+        console.log('Chat RAG: Attempting to call match_document_chunks RPC with embedding:', queryEmbedding);
+        const { data: matchedChunks, error: matchError } = await supabase.rpc(
+          'match_document_chunks',
+          {
+            query_embedding: queryEmbedding,
+            match_threshold: 0.75, // Adjust threshold as needed
+            match_count: 3,        // Adjust count as needed
+            user_id: user.id      // Pass user ID for personalized knowledge retrieval
+          }
+        );
+        console.log('Chat RAG: RPC response received:', { hasError: !!matchError, chunksCount: matchedChunks?.length });
+
+        if (matchError) {
+          console.error("Chat RAG: Error matching document chunks:", matchError);
+        } else if (matchedChunks && matchedChunks.length > 0) {
+          retrievedContext = "Based on the uploaded knowledge documents, here's some relevant information:\n\n---\n";
+          matchedChunks.forEach((chunk: any) => {
+            retrievedContext += chunk.chunk_text + "\n---\n";
+          });
+          console.log("Chat RAG: Retrieved context added to prompt.");
+        } else {
+          console.log("Chat RAG: No sufficiently relevant chunks found in knowledge base for the query.");
+        }
+      } else {
+        console.warn("Chat RAG: Could not generate a valid embedding for the user query.");
+      }
+    }
+
+    if (retrievedContext) {
+      systemPromptContent += `
+
+You have access to the following relevant information from uploaded documents. Use this to answer the user's current question if applicable, in addition to your general knowledge. If the provided information directly answers the question, prioritize it and cite it implicitly (e.g., "According to the material provided...").
+Relevant information:
+<KNOWLEDGE_BASE_CONTEXT>
+${retrievedContext}
+</KNOWLEDGE_BASE_CONTEXT>
+`;
+    }
+
     systemPromptContent += ` Current time: ${timeString}.`;
 
     systemPromptContent += `
 
-    General Instructions:
-    - Be patient, clear, and break down complex topics into smaller, understandable parts.
-    - Use positive reinforcement and encourage curiosity.
-    - If a topic is very advanced or outside a typical K-12 scope, you can gently say so and offer to explain foundational concepts instead.
-    - Avoid overly technical jargon unless explaining it.
+General Instructions:
+- Be patient, clear, and break down complex topics into smaller, understandable parts.
+- Use positive reinforcement and encourage curiosity.
+- If a topic is very advanced or outside a typical K-12 scope, you can gently say so and offer to explain foundational concepts instead.
+- Avoid overly technical jargon unless explaining it.
 
-    Subject-Specific Instructions:
-    - Mathematics: When explaining mathematical concepts, equations, or formulas, always use LaTeX format. For block equations, enclose LaTeX in \`$$...$$\`. For inline mathematical expressions, enclose LaTeX in \`$...$\`. Show step-by-step solutions when appropriate.
-    - Coding/Programming:
-        1. When a user asks for help with coding (e.g., Python, JavaScript, HTML, CSS, Java, C#), try to understand the programming language if specified or infer it from the context or code provided.
-        2. Provide clear, concise, and correct code examples. Always use Markdown fenced code blocks with the language specified (e.g., \`\`\`python\nprint('Hello')\n\`\`\` or \`\`\`javascript\nconsole.log('Hello');\n\`\`\`).
-        3. Explain the code's logic, purpose, and how it works, especially for beginners.
-        4. If a user provides code that might contain an error, try to identify the likely bug or area for improvement and suggest a fix or debugging approach. Do not just give the corrected code without explanation.
-        5. Offer to explain specific programming concepts, keywords, or functions related to their query.
-        6. If a user asks for a large or complex piece of code, guide them by breaking down the problem or suggesting a simpler starting point, rather than writing extensive applications.
-    - Essay Writing & Summaries: (Instructions for Essay Helper & Smart Notes are handled by their specific actions, but general queries here should be consistent). For general queries about writing, offer tips on structure, clarity, and grammar.
+Subject-Specific Instructions:
+- Mathematics: When explaining mathematical concepts, equations, or formulas, always use LaTeX format. For block equations, enclose LaTeX in \`$$...$$\`. For inline mathematical expressions, enclose LaTeX in \`$...$\`. Show step-by-step solutions when appropriate.
+- Coding/Programming:
+    1. When a user asks for help with coding (e.g., Python, JavaScript, HTML, CSS, Java, C#), try to understand the programming language if specified or infer it from the context or code provided.
+    2. Provide clear, concise, and correct code examples. Always use Markdown fenced code blocks with the language specified (e.g., \`\`\`python
+print('Hello')
+\n\`\`\` or \`\`\`javascript
+console.log('Hello');
+\n\`\`\`).
+    3. Explain the code's logic, purpose, and how it works, especially for beginners.
+    4. If a user provides code that might contain an error, try to identify the likely bug or area for improvement and suggest a fix or debugging approach. Do not just give the corrected code without explanation.
+    5. Offer to explain specific programming concepts, keywords, or functions related to their query.
+    6. If a user asks for a large or complex piece of code, guide them by breaking down the problem or suggesting a simpler starting point, rather than writing extensive applications.
+- Essay Writing & Summaries: (Instructions for Essay Helper & Smart Notes are handled by their specific actions, but general queries here should be consistent). For general queries about writing, offer tips on structure, clarity, and grammar.
 
-    Your goal is to empower students to learn and understand concepts effectively. Maintain a supportive and helpful persona at all times.`;
-    // --- End of Personalized System Prompt Construction ---
+Your goal is to empower students to learn and understand concepts effectively. Maintain a supportive and helpful persona at all times.`;
 
     const groqMessagesForAPI: Groq.Chat.Completions.ChatCompletionMessageParam[] =
       [
         {
           role: "system",
-          content: systemPromptContent // Use the dynamically constructed prompt
+          content: systemPromptContent // Use the dynamically constructed prompt with RAG context
         },
         ...(clientMessages as VercelAIMessage[])
           .map(
@@ -252,7 +349,6 @@ export async function POST(req: Request) {
             },
           })}\n`;
           controller.enqueue(encoder.encode(finishPart));
-          controller.close();
           controller.close();
         } catch (streamError) {
           console.error("Error during Groq stream processing:", streamError);

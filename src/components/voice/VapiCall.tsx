@@ -409,7 +409,7 @@ export default function VapiCall({
             {/* Start Call Button */}
             <Button 
               onClick={startCall} 
-              className="w-full h-16 text-lg font-semibold bg-gradient-to-r from-[#fd6a3e] to-[#022e7d] hover:from-[#fd6a3e]/90 hover:to-[#022e7d]/90 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] active:scale-[0.98] text-white"
+              className="w-full sm:w-auto text-lg font-semibold py-8 px-10 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 bg-green-600 hover:bg-green-700 text-white"
               disabled={isLoading || callStatus === "connecting"}
             >
               {isLoading ? (
