@@ -38,9 +38,15 @@ async function generateQueryEmbedding(text: string): Promise<number[] | null> {
     const embeddingResponse = await response.json();
     console.log('Chat RAG: Received embedding response:', embeddingResponse);
     
-    if (embeddingResponse && Array.isArray(embeddingResponse.embeddings) && 
-        Array.isArray(embeddingResponse.embeddings[0]) && 
-        typeof embeddingResponse.embeddings[0][0] === 'number') {
+    // Handle both possible response formats from HuggingFace
+    if (embeddingResponse && Array.isArray(embeddingResponse)) {
+      // Format 1: Direct array response
+      return embeddingResponse;
+    } else if (embeddingResponse && 
+               Array.isArray(embeddingResponse.embeddings) && 
+               Array.isArray(embeddingResponse.embeddings[0]) && 
+               typeof embeddingResponse.embeddings[0][0] === 'number') {
+      // Format 2: Nested embeddings property
       return embeddingResponse.embeddings[0];
     }
     
