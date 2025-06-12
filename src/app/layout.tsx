@@ -10,7 +10,7 @@ import Navbar from "@/components/layout/Navbar"; // Import the Navbar
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "LearnBrigeEdu",
+  title: "CogniSpark AI",
   description: "The future of personalized learning.",
   // Add icons here if you have them, e.g., for browser tab
   // icons: {

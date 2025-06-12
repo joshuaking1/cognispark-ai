@@ -6,17 +6,34 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Check } from "lucide-react";
 
 import OnboardingDialog from "@/components/onboarding/OnboardingDialog";
-import LearningPlanGenerator, { LearningPlan, LearningPlanItem } from "@/components/dashboard/LearningPlanGenerator";
+import LearningPlanGenerator, {
+  LearningPlan,
+  LearningPlanItem,
+} from "@/components/dashboard/LearningPlanGenerator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -24,12 +41,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Loader2, 
-  Lightbulb, 
-  MessageSquare, 
-  BookOpen, 
-  FileText, 
-  Brain, 
+  Loader2,
+  Lightbulb,
+  MessageSquare,
+  BookOpen,
+  FileText,
+  Brain,
   LogOut,
   ArrowRight,
   Calendar,
@@ -46,19 +63,24 @@ import {
   PlayCircle,
   CheckCircle2,
   Star,
-  Zap
+  Zap,
 } from "lucide-react";
 import { getActiveTipOfTheDayAction } from "@/app/actions/adminActions"; // Action to fetch tip
 import ChatMessageContentRenderer from "@/components/chat/ChatMessageContentRenderer";
 
-interface AppSnippet { // Type for the tip
-    title?: string | null;
-    content: string;
-    link_url?: string | null;
-    snippet_type: string;
+interface AppSnippet {
+  // Type for the tip
+  title?: string | null;
+  content: string;
+  link_url?: string | null;
+  snippet_type: string;
 }
 import { updateUserProfile } from "@/app/actions/userSettingsActions";
-import { saveActiveLearningPlanAction, markLearningPlanStepAction, clearActiveLearningPlanAction } from "@/app/actions/learningPlanActions";
+import {
+  saveActiveLearningPlanAction,
+  markLearningPlanStepAction,
+  clearActiveLearningPlanAction,
+} from "@/app/actions/learningPlanActions";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Profile {
@@ -69,6 +91,7 @@ interface Profile {
   has_completed_onboarding: boolean | null;
   active_learning_plan: LearningPlan | null;
   active_plan_completed_steps: string[] | null;
+  role?: "student" | "teacher" | "admin" | null;
 }
 
 interface User {
@@ -78,7 +101,7 @@ interface User {
 
 interface RecentActivity {
   id: string;
-  type: 'flashcard' | 'chat' | 'quiz';
+  type: "flashcard" | "chat" | "quiz";
   title: string;
   timestamp: string;
   details?: string;
@@ -95,12 +118,13 @@ export default function DashboardPage() {
   const [activeTip, setActiveTip] = useState<AppSnippet | null>(null);
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [showLearningPlanGenerator, setShowLearningPlanGenerator] = useState(false);
+  const [showLearningPlanGenerator, setShowLearningPlanGenerator] =
+    useState(false);
   const [stats, setStats] = useState({
     totalFlashcards: 0,
     totalChats: 0,
     totalQuizzes: 0,
-    masteryLevel: 0
+    masteryLevel: 0,
   });
 
   const supabase = createClientComponentClient();
@@ -109,7 +133,9 @@ export default function DashboardPage() {
     const fetchDashboardData = async () => {
       setIsLoading(true);
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         if (!session?.user) {
           router.push("/login");
           return;
@@ -118,11 +144,13 @@ export default function DashboardPage() {
 
         // Fetch profile with active plan
         const { data: profileData } = await supabase
-          .from('profiles')
-          .select('full_name, avatar_url, grade_level, subjects_of_interest, has_completed_onboarding, active_learning_plan, active_plan_completed_steps')
-          .eq('id', session.user.id)
+          .from("profiles")
+          .select(
+            "full_name, avatar_url, grade_level, subjects_of_interest, has_completed_onboarding, active_learning_plan, active_plan_completed_steps"
+          )
+          .eq("id", session.user.id)
           .single();
-        
+
         setProfile(profileData);
         if (profileData?.active_learning_plan) {
           setActivePlan(profileData.active_learning_plan as LearningPlan);
@@ -134,16 +162,16 @@ export default function DashboardPage() {
 
         // Fetch recent activity
         const { data: activityData } = await supabase
-          .from('activity_log')
-          .select('*')
-          .eq('user_id', session.user.id)
-          .order('timestamp', { ascending: false })
+          .from("activity_log")
+          .select("*")
+          .eq("user_id", session.user.id)
+          .order("timestamp", { ascending: false })
           .limit(5);
 
         setRecentActivity(activityData || []);
 
         // Fetch active tip
-        getActiveTipOfTheDayAction().then(result => {
+        getActiveTipOfTheDayAction().then((result) => {
           if (result.tip) {
             setActiveTip(result.tip as AppSnippet); // Cast to AppSnippet
           }
@@ -151,41 +179,42 @@ export default function DashboardPage() {
 
         // Fetch stats
         const { count: flashcardCount } = await supabase
-          .from('flashcards')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', session.user.id);
+          .from("flashcards")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", session.user.id);
 
         const { count: chatCount } = await supabase
-          .from('chat_sessions')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', session.user.id);
+          .from("chat_sessions")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", session.user.id);
 
         const { count: quizCount } = await supabase
-          .from('quiz_attempts')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', session.user.id);
+          .from("quiz_attempts")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", session.user.id);
 
         setStats({
           totalFlashcards: flashcardCount || 0,
           totalChats: chatCount || 0,
           totalQuizzes: quizCount || 0,
-          masteryLevel: 75 // This would be calculated based on actual performance
+          masteryLevel: 75, // This would be calculated based on actual performance
         });
-
       } catch (error) {
-        console.error('Error fetching dashboard data:', error);
+        console.error("Error fetching dashboard data:", error);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchDashboardData();
-    
-    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_OUT') router.push('/login');
-      else if (session?.user) setUser(session.user as User);
-      else setUser(null);
-    });
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        if (event === "SIGNED_OUT") router.push("/login");
+        else if (session?.user) setUser(session.user as User);
+        else setUser(null);
+      }
+    );
 
     return () => authListener?.subscription.unsubscribe();
   }, [supabase, router]);
@@ -196,10 +225,13 @@ export default function DashboardPage() {
     }
   }, [profile]);
 
-  const handlePlanGenerated = async (plan: LearningPlan | null, error?: string) => {
-    if (error) { 
-      toast.error("Plan Error", { description: error }); 
-      return; 
+  const handlePlanGenerated = async (
+    plan: LearningPlan | null,
+    error?: string
+  ) => {
+    if (error) {
+      toast.error("Plan Error", { description: error });
+      return;
     }
     if (plan) {
       setLearningPlan(plan); // Show the newly generated plan
@@ -237,7 +269,7 @@ export default function DashboardPage() {
     // Optimistic UI update
     const newCompletedSteps = newCompletedStatus
       ? [...completedSteps, stepId]
-      : completedSteps.filter(id => id !== stepId);
+      : completedSteps.filter((id) => id !== stepId);
     setCompletedSteps(newCompletedSteps);
 
     const result = await markLearningPlanStepAction(stepId, newCompletedStatus);
@@ -271,20 +303,24 @@ export default function DashboardPage() {
           </div>
           <Skeleton className="h-10 w-32" />
         </div>
-        
+
         {/* Stats Skeleton */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Quick Actions */}
           <Card className="border-0 shadow-lg overflow-hidden">
             <CardHeader className="bg-gradient-to-r from-[#022e7d]/5 via-white to-[#fd6a3e]/5 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800">
-              <CardTitle className="text-lg font-bold bg-gradient-to-r from-[#022e7d] to-[#fd6a3e] bg-clip-text text-transparent">Quick Actions</CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-400">Get started with these activities</CardDescription>
+              <CardTitle className="text-lg font-bold bg-gradient-to-r from-[#022e7d] to-[#fd6a3e] bg-clip-text text-transparent">
+                Quick Actions
+              </CardTitle>
+              <CardDescription className="text-slate-600 dark:text-slate-400">
+                Get started with these activities
+              </CardDescription>
             </CardHeader>
             <CardContent className="p-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Button 
-                  variant="outline" 
-                  className="justify-start p-4 h-auto border border-slate-200 dark:border-slate-700 hover:border-[#fd6a3e]/30 dark:hover:border-[#fd6a3e]/30 hover:bg-gradient-to-r hover:from-[#fd6a3e]/5 hover:to-transparent shadow-sm hover:shadow-md transition-all duration-300" 
+                <Button
+                  variant="outline"
+                  className="justify-start p-4 h-auto border border-slate-200 dark:border-slate-700 hover:border-[#fd6a3e]/30 dark:hover:border-[#fd6a3e]/30 hover:bg-gradient-to-r hover:from-[#fd6a3e]/5 hover:to-transparent shadow-sm hover:shadow-md transition-all duration-300"
                   asChild
                 >
                   <Link href="/chat">
@@ -292,15 +328,19 @@ export default function DashboardPage() {
                       <MessageSquare className="h-4 w-4 text-white" />
                     </div>
                     <div className="text-left">
-                      <div className="font-medium text-[#022e7d] dark:text-[#fd6a3e]">Chat with Learnbridge AI</div>
-                      <div className="text-xs text-slate-600 dark:text-slate-400">Ask questions or brainstorm ideas</div>
+                      <div className="font-medium text-[#022e7d] dark:text-[#fd6a3e]">
+                        Chat with Learnbridge AI
+                      </div>
+                      <div className="text-xs text-slate-600 dark:text-slate-400">
+                        Ask questions or brainstorm ideas
+                      </div>
                     </div>
                   </Link>
                 </Button>
 
-                <Button 
-                  variant="outline" 
-                  className="justify-start p-4 h-auto border border-slate-200 dark:border-slate-700 hover:border-[#022e7d]/30 dark:hover:border-[#022e7d]/30 hover:bg-gradient-to-r hover:from-[#022e7d]/5 hover:to-transparent shadow-sm hover:shadow-md transition-all duration-300" 
+                <Button
+                  variant="outline"
+                  className="justify-start p-4 h-auto border border-slate-200 dark:border-slate-700 hover:border-[#022e7d]/30 dark:hover:border-[#022e7d]/30 hover:bg-gradient-to-r hover:from-[#022e7d]/5 hover:to-transparent shadow-sm hover:shadow-md transition-all duration-300"
                   asChild
                 >
                   <Link href="/flashcards">
@@ -308,15 +348,19 @@ export default function DashboardPage() {
                       <BookOpen className="h-4 w-4 text-white" />
                     </div>
                     <div className="text-left">
-                      <div className="font-medium text-[#022e7d] dark:text-[#fd6a3e]">Study Flashcards</div>
-                      <div className="text-xs text-slate-600 dark:text-slate-400">Review your learning material</div>
+                      <div className="font-medium text-[#022e7d] dark:text-[#fd6a3e]">
+                        Study Flashcards
+                      </div>
+                      <div className="text-xs text-slate-600 dark:text-slate-400">
+                        Review your learning material
+                      </div>
                     </div>
                   </Link>
                 </Button>
 
-                <Button 
-                  variant="outline" 
-                  className="justify-start p-4 h-auto border border-slate-200 dark:border-slate-700 hover:border-[#fd6a3e]/30 dark:hover:border-[#fd6a3e]/30 hover:bg-gradient-to-r hover:from-[#fd6a3e]/5 hover:to-transparent shadow-sm hover:shadow-md transition-all duration-300" 
+                <Button
+                  variant="outline"
+                  className="justify-start p-4 h-auto border border-slate-200 dark:border-slate-700 hover:border-[#fd6a3e]/30 dark:hover:border-[#fd6a3e]/30 hover:bg-gradient-to-r hover:from-[#fd6a3e]/5 hover:to-transparent shadow-sm hover:shadow-md transition-all duration-300"
                   asChild
                 >
                   <Link href="/quiz">
@@ -324,15 +368,19 @@ export default function DashboardPage() {
                       <FileText className="h-4 w-4 text-white" />
                     </div>
                     <div className="text-left">
-                      <div className="font-medium text-[#022e7d] dark:text-[#fd6a3e]">Take a Quiz</div>
-                      <div className="text-xs text-slate-600 dark:text-slate-400">Test your knowledge</div>
+                      <div className="font-medium text-[#022e7d] dark:text-[#fd6a3e]">
+                        Take a Quiz
+                      </div>
+                      <div className="text-xs text-slate-600 dark:text-slate-400">
+                        Test your knowledge
+                      </div>
                     </div>
                   </Link>
                 </Button>
 
-                <Button 
-                  variant="outline" 
-                  className="justify-start p-4 h-auto border border-slate-200 dark:border-slate-700 hover:border-[#022e7d]/30 dark:hover:border-[#022e7d]/30 hover:bg-gradient-to-r hover:from-[#022e7d]/5 hover:to-transparent shadow-sm hover:shadow-md transition-all duration-300" 
+                <Button
+                  variant="outline"
+                  className="justify-start p-4 h-auto border border-slate-200 dark:border-slate-700 hover:border-[#022e7d]/30 dark:hover:border-[#022e7d]/30 hover:bg-gradient-to-r hover:from-[#022e7d]/5 hover:to-transparent shadow-sm hover:shadow-md transition-all duration-300"
                   asChild
                 >
                   <Link href="/settings">
@@ -340,8 +388,12 @@ export default function DashboardPage() {
                       <Settings className="h-4 w-4 text-white" />
                     </div>
                     <div className="text-left">
-                      <div className="font-medium text-[#022e7d] dark:text-[#fd6a3e]">Settings</div>
-                      <div className="text-xs text-slate-600 dark:text-slate-400">Customize your experience</div>
+                      <div className="font-medium text-[#022e7d] dark:text-[#fd6a3e]">
+                        Settings
+                      </div>
+                      <div className="text-xs text-slate-600 dark:text-slate-400">
+                        Customize your experience
+                      </div>
                     </div>
                   </Link>
                 </Button>
@@ -418,31 +470,32 @@ export default function DashboardPage() {
     <div className="container mx-auto py-8 px-4 space-y-8">
       {/* === Active Tip of the Day Section === */}
       {activeTip && (
-        <section className="mb-6"> 
-            <Card className="bg-gradient-to-br from-[#fd6a3e]/10 via-white to-[#022e7d]/10 dark:from-[#fd6a3e]/20 dark:via-slate-800 dark:to-[#022e7d]/20 border-[#fd6a3e]/20 shadow-lg rounded-xl overflow-hidden">
-                <CardHeader className="pb-3 pt-4 px-5 relative">
-                    <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-[#fd6a3e]/10 to-[#022e7d]/10 rounded-full -translate-y-20 translate-x-20 z-0" />
-                    <CardTitle className="text-lg font-semibold text-[#022e7d] dark:text-[#fd6a3e] flex items-center relative z-10">
-                        <div className="mr-3 h-8 w-8 rounded-full bg-gradient-to-br from-[#fd6a3e] to-[#ff8c69] flex items-center justify-center shadow-md">
-                            <Lightbulb className="h-4 w-4 text-white animate-pulse" />
-                        </div>
-                        {activeTip.title || "Nova's Tip of the Day!"}
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="prose prose-sm dark:prose-invert max-w-none px-5 pb-4 text-slate-700 dark:text-slate-300 relative z-10">
-                    <ChatMessageContentRenderer content={activeTip.content} />
-                    {activeTip.link_url && (
-                        <a 
-                            href={activeTip.link_url} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="text-[#fd6a3e] hover:text-[#e55a2e] hover:underline text-xs block mt-2 font-medium flex items-center group transition-colors"
-                        >
-                            Learn More <ArrowRight className="ml-1 h-3 w-3 transition-transform group-hover:translate-x-1" />
-                        </a>
-                    )}
-                </CardContent>
-            </Card>
+        <section className="mb-6">
+          <Card className="bg-gradient-to-br from-[#fd6a3e]/10 via-white to-[#022e7d]/10 dark:from-[#fd6a3e]/20 dark:via-slate-800 dark:to-[#022e7d]/20 border-[#fd6a3e]/20 shadow-lg rounded-xl overflow-hidden">
+            <CardHeader className="pb-3 pt-4 px-5 relative">
+              <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-[#fd6a3e]/10 to-[#022e7d]/10 rounded-full -translate-y-20 translate-x-20 z-0" />
+              <CardTitle className="text-lg font-semibold text-[#022e7d] dark:text-[#fd6a3e] flex items-center relative z-10">
+                <div className="mr-3 h-8 w-8 rounded-full bg-gradient-to-br from-[#fd6a3e] to-[#ff8c69] flex items-center justify-center shadow-md">
+                  <Lightbulb className="h-4 w-4 text-white animate-pulse" />
+                </div>
+                {activeTip.title || "Nova's Tip of the Day!"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="prose prose-sm dark:prose-invert max-w-none px-5 pb-4 text-slate-700 dark:text-slate-300 relative z-10">
+              <ChatMessageContentRenderer content={activeTip.content} />
+              {activeTip.link_url && (
+                <a
+                  href={activeTip.link_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#fd6a3e] hover:text-[#e55a2e] hover:underline text-xs block mt-2 font-medium flex items-center group transition-colors"
+                >
+                  Learn More{" "}
+                  <ArrowRight className="ml-1 h-3 w-3 transition-transform group-hover:translate-x-1" />
+                </a>
+              )}
+            </CardContent>
+          </Card>
         </section>
       )}
       {/* === END Tip of the Day Section === */}
@@ -454,17 +507,20 @@ export default function DashboardPage() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-6 relative z-10">
           <div className="space-y-2">
             <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-[#022e7d] to-[#fd6a3e] bg-clip-text text-transparent">
-              {getGreeting()}{profile?.full_name ? `, ${profile.full_name.split(' ')[0]}` : ''}!
+              {getGreeting()}
+              {profile?.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}
+              !
             </h1>
             <p className="text-slate-600 dark:text-slate-300">
               Ready to continue your learning journey?
             </p>
           </div>
           <div className="flex gap-2">
-            <Button 
-              onClick={() => router.push('/chat')} 
+            <Button
+              onClick={() => router.push("/chat")}
               size="lg"
-              className="bg-gradient-to-r from-[#fd6a3e] to-[#ff8c69] hover:from-[#e55a2e] hover:to-[#fd6a3e] text-white shadow-lg hover:shadow-xl transition-all duration-300">
+              className="bg-gradient-to-r from-[#fd6a3e] to-[#ff8c69] hover:from-[#e55a2e] hover:to-[#fd6a3e] text-white shadow-lg hover:shadow-xl transition-all duration-300"
+            >
               <MessageSquare className="mr-2 h-4 w-4" />
               Start Learning
             </Button>
@@ -480,7 +536,9 @@ export default function DashboardPage() {
           <CardContent className="p-6 relative z-10">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-[#022e7d] dark:text-blue-300">Flashcards</p>
+                <p className="text-sm font-medium text-[#022e7d] dark:text-blue-300">
+                  Flashcards
+                </p>
                 <h3 className="text-2xl font-bold">{stats.totalFlashcards}</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   <TrendingUp className="h-3 w-3 inline mr-1 text-[#fd6a3e]" />
@@ -500,7 +558,9 @@ export default function DashboardPage() {
           <CardContent className="p-6 relative z-10">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-[#fd6a3e] dark:text-orange-300">Chat Sessions</p>
+                <p className="text-sm font-medium text-[#fd6a3e] dark:text-orange-300">
+                  Chat Sessions
+                </p>
                 <h3 className="text-2xl font-bold">{stats.totalChats}</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   <TrendingUp className="h-3 w-3 inline mr-1 text-[#022e7d]" />
@@ -520,7 +580,9 @@ export default function DashboardPage() {
           <CardContent className="p-6 relative z-10">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-[#022e7d] dark:text-blue-300">Quizzes</p>
+                <p className="text-sm font-medium text-[#022e7d] dark:text-blue-300">
+                  Quizzes
+                </p>
                 <h3 className="text-2xl font-bold">{stats.totalQuizzes}</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   <TrendingUp className="h-3 w-3 inline mr-1 text-[#fd6a3e]" />
@@ -540,10 +602,18 @@ export default function DashboardPage() {
           <CardContent className="p-6 relative z-10">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-[#fd6a3e] dark:text-orange-300">Mastery Level</p>
+                <p className="text-sm font-medium text-[#fd6a3e] dark:text-orange-300">
+                  Mastery Level
+                </p>
                 <h3 className="text-2xl font-bold">{stats.masteryLevel}%</h3>
-                <Progress value={stats.masteryLevel} className="mt-2 h-2 bg-slate-200 dark:bg-slate-700">
-                  <div className="h-full bg-gradient-to-r from-[#fd6a3e] to-[#022e7d] rounded-full" style={{ width: `${stats.masteryLevel}%` }} />
+                <Progress
+                  value={stats.masteryLevel}
+                  className="mt-2 h-2 bg-slate-200 dark:bg-slate-700"
+                >
+                  <div
+                    className="h-full bg-gradient-to-r from-[#fd6a3e] to-[#022e7d] rounded-full"
+                    style={{ width: `${stats.masteryLevel}%` }}
+                  />
                 </Progress>
               </div>
               <div className="h-12 w-12 bg-gradient-to-br from-[#fd6a3e] to-[#ff8c69] rounded-lg flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
@@ -567,18 +637,22 @@ export default function DashboardPage() {
                   </div>
                   <div>
                     <CardTitle className="text-xl font-bold bg-gradient-to-r from-[#022e7d] to-[#fd6a3e] bg-clip-text text-transparent">
-                      {activePlan ? "Your Learning Plan" : "Generate Learning Plan"}
+                      {activePlan
+                        ? "Your Learning Plan"
+                        : "Generate Learning Plan"}
                     </CardTitle>
                     <CardDescription className="text-slate-600 dark:text-slate-400">
-                      {activePlan 
+                      {activePlan
                         ? `${planProgress}% complete • ${completedSteps.length}/${activePlan.steps.length} steps done`
-                        : "Let Nova create a personalized learning plan for you"
-                      }
+                        : "Let Nova create a personalized learning plan for you"}
                     </CardDescription>
                   </div>
                 </div>
                 {activePlan && (
-                  <Badge variant="secondary" className="bg-gradient-to-r from-[#fd6a3e]/10 to-[#022e7d]/10 text-[#022e7d] dark:text-[#fd6a3e] border border-[#fd6a3e]/20 shadow-sm">
+                  <Badge
+                    variant="secondary"
+                    className="bg-gradient-to-r from-[#fd6a3e]/10 to-[#022e7d]/10 text-[#022e7d] dark:text-[#fd6a3e] border border-[#fd6a3e]/20 shadow-sm"
+                  >
                     <CheckCircle2 className="h-3 w-3 mr-1 text-[#fd6a3e]" />
                     Active
                   </Badge>
@@ -586,9 +660,9 @@ export default function DashboardPage() {
               </div>
               {activePlan && (
                 <div className="mt-4 h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-[#fd6a3e] to-[#022e7d] rounded-full transition-all duration-500" 
-                    style={{ width: `${planProgress}%` }} 
+                  <div
+                    className="h-full bg-gradient-to-r from-[#fd6a3e] to-[#022e7d] rounded-full transition-all duration-500"
+                    style={{ width: `${planProgress}%` }}
                   />
                 </div>
               )}
@@ -602,9 +676,12 @@ export default function DashboardPage() {
                       <Sparkles className="h-8 w-8 text-[#fd6a3e] dark:text-[#fd6a3e]" />
                     </div>
                     <div className="space-y-2">
-                      <h3 className="text-lg font-medium">Ready to start learning?</h3>
+                      <h3 className="text-lg font-medium">
+                        Ready to start learning?
+                      </h3>
                       <p className="text-sm text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-                        Get a personalized learning plan based on your interests and goals
+                        Get a personalized learning plan based on your interests
+                        and goals
                       </p>
                     </div>
                   </div>
@@ -633,23 +710,41 @@ export default function DashboardPage() {
                     {displayPlan.steps.map((step, index) => {
                       const isCompleted = completedSteps.includes(step.id);
                       return (
-                        <Card 
-                          key={step.id} 
+                        <Card
+                          key={step.id}
                           className={`transition-all duration-200 border shadow-sm ${
-                            isCompleted 
-                              ? 'bg-gradient-to-r from-[#fd6a3e]/5 to-transparent dark:from-[#fd6a3e]/10 dark:to-transparent border-[#fd6a3e]/30 dark:border-[#fd6a3e]/30' 
-                              : 'hover:shadow-md hover:border-[#022e7d]/30 dark:hover:border-[#022e7d]/30'
+                            isCompleted
+                              ? "bg-gradient-to-r from-[#fd6a3e]/5 to-transparent dark:from-[#fd6a3e]/10 dark:to-transparent border-[#fd6a3e]/30 dark:border-[#fd6a3e]/30"
+                              : "hover:shadow-md hover:border-[#022e7d]/30 dark:hover:border-[#022e7d]/30"
                           }`}
                         >
                           <CardContent className="p-4">
                             <div className="flex items-start gap-3">
                               {activePlan === displayPlan ? (
                                 <div className="mt-1">
-                                  <div className={`w-5 h-5 rounded-full flex items-center justify-center shadow-sm ${isCompleted ? 'bg-gradient-to-r from-[#fd6a3e] to-[#ff8c69] text-white' : 'border border-[#022e7d]/30 dark:border-[#022e7d]/50'}`}>
+                                  <div
+                                    className={`w-5 h-5 rounded-full flex items-center justify-center shadow-sm ${
+                                      isCompleted
+                                        ? "bg-gradient-to-r from-[#fd6a3e] to-[#ff8c69] text-white"
+                                        : "border border-[#022e7d]/30 dark:border-[#022e7d]/50"
+                                    }`}
+                                  >
                                     {isCompleted ? (
-                                      <Check className="h-3 w-3" onClick={() => toggleStepCompletion(step.id)} style={{ cursor: 'pointer' }} />
+                                      <Check
+                                        className="h-3 w-3"
+                                        onClick={() =>
+                                          toggleStepCompletion(step.id)
+                                        }
+                                        style={{ cursor: "pointer" }}
+                                      />
                                     ) : (
-                                      <div className="h-3 w-3 rounded-full" onClick={() => toggleStepCompletion(step.id)} style={{ cursor: 'pointer' }} />
+                                      <div
+                                        className="h-3 w-3 rounded-full"
+                                        onClick={() =>
+                                          toggleStepCompletion(step.id)
+                                        }
+                                        style={{ cursor: "pointer" }}
+                                      />
                                     )}
                                   </div>
                                 </div>
@@ -659,32 +754,50 @@ export default function DashboardPage() {
                                 </div>
                               )}
                               <div className="flex-grow space-y-2">
-                                <Label 
-                                  htmlFor={`step-${step.id}`} 
-                                  className={`font-medium cursor-pointer ${isCompleted ? 'line-through text-slate-500 dark:text-slate-400' : 'text-[#022e7d] dark:text-[#fd6a3e]'}`}
+                                <Label
+                                  htmlFor={`step-${step.id}`}
+                                  className={`font-medium cursor-pointer ${
+                                    isCompleted
+                                      ? "line-through text-slate-500 dark:text-slate-400"
+                                      : "text-[#022e7d] dark:text-[#fd6a3e]"
+                                  }`}
                                 >
                                   {step.title}
                                 </Label>
                                 {step.description && (
-                                  <div className={`text-sm ${isCompleted ? 'text-slate-500 dark:text-slate-500' : 'text-slate-600 dark:text-slate-400'}`}>
-                                    <ChatMessageContentRenderer content={step.description} />
+                                  <div
+                                    className={`text-sm ${
+                                      isCompleted
+                                        ? "text-slate-500 dark:text-slate-500"
+                                        : "text-slate-600 dark:text-slate-400"
+                                    }`}
+                                  >
+                                    <ChatMessageContentRenderer
+                                      content={step.description}
+                                    />
                                   </div>
                                 )}
                                 {step.action_link && (
-                                  <Button 
-                                    asChild 
-                                    variant="link" 
-                                    size="sm" 
+                                  <Button
+                                    asChild
+                                    variant="link"
+                                    size="sm"
                                     className="h-auto p-0 text-xs text-[#fd6a3e] hover:text-[#e55a2e]"
                                   >
-                                    <Link 
-                                      href={step.action_link} 
-                                      target={step.action_link.startsWith('http') ? '_blank' : '_self'}
+                                    <Link
+                                      href={step.action_link}
+                                      target={
+                                        step.action_link.startsWith("http")
+                                          ? "_blank"
+                                          : "_self"
+                                      }
                                       className="flex items-center gap-1"
                                     >
                                       <PlayCircle className="h-3 w-3" />
-                                      {step.action_link.startsWith('http') 
-                                        ? `Go to ${step.resource_type || 'Resource'}` 
+                                      {step.action_link.startsWith("http")
+                                        ? `Go to ${
+                                            step.resource_type || "Resource"
+                                          }`
                                         : "Let's do this!"}
                                     </Link>
                                   </Button>
@@ -715,16 +828,16 @@ export default function DashboardPage() {
                           <Zap className="mr-2 h-4 w-4" />
                           Activate This Plan
                         </Button>
-                        <Button variant="outline" onClick={() => setLearningPlan(null)}>
+                        <Button
+                          variant="outline"
+                          onClick={() => setLearningPlan(null)}
+                        >
                           Dismiss
                         </Button>
                       </>
                     )}
                     {activePlan && !learningPlan && (
-                      <Button 
-                        variant="outline" 
-                        onClick={handleClearActivePlan}
-                      >
+                      <Button variant="outline" onClick={handleClearActivePlan}>
                         Generate New Plan
                       </Button>
                     )}
@@ -740,57 +853,93 @@ export default function DashboardPage() {
           {/* Quick Actions */}
           <Card className="border-0 shadow-lg overflow-hidden">
             <CardHeader className="bg-gradient-to-r from-[#022e7d]/5 via-white to-[#fd6a3e]/5 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800">
-              <CardTitle className="text-lg font-bold bg-gradient-to-r from-[#022e7d] to-[#fd6a3e] bg-clip-text text-transparent">Quick Actions</CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-400">Jump into your favorite activities</CardDescription>
+              <CardTitle className="text-lg font-bold bg-gradient-to-r from-[#022e7d] to-[#fd6a3e] bg-clip-text text-transparent">
+                Quick Actions
+              </CardTitle>
+              <CardDescription className="text-slate-600 dark:text-slate-400">
+                Jump into your favorite activities
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 p-4">
-              <Button asChild variant="ghost" className="w-full justify-start h-14 hover:bg-[#022e7d]/5 dark:hover:bg-[#022e7d]/10 transition-all duration-200 rounded-lg group">
+              <Button
+                asChild
+                variant="ghost"
+                className="w-full justify-start h-14 hover:bg-[#022e7d]/5 dark:hover:bg-[#022e7d]/10 transition-all duration-200 rounded-lg group"
+              >
                 <Link href="/flashcards">
                   <div className="mr-3 h-10 w-10 rounded-full bg-gradient-to-br from-[#022e7d] to-[#1e3a8a] flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
                     <BookOpen className="h-5 w-5 text-white" />
                   </div>
                   <div className="text-left">
-                    <div className="font-medium text-[#022e7d] dark:text-[#fd6a3e]">Study Flashcards</div>
-                    <div className="text-xs text-slate-600 dark:text-slate-400">Review your cards</div>
+                    <div className="font-medium text-[#022e7d] dark:text-[#fd6a3e]">
+                      Study Flashcards
+                    </div>
+                    <div className="text-xs text-slate-600 dark:text-slate-400">
+                      Review your cards
+                    </div>
                   </div>
                   <ChevronRight className="ml-auto h-4 w-4 text-slate-400 group-hover:text-[#fd6a3e] group-hover:translate-x-1 transition-all" />
                 </Link>
               </Button>
-              
-              <Button asChild variant="ghost" className="w-full justify-start h-14 hover:bg-[#fd6a3e]/5 dark:hover:bg-[#fd6a3e]/10 transition-all duration-200 rounded-lg group">
+
+              <Button
+                asChild
+                variant="ghost"
+                className="w-full justify-start h-14 hover:bg-[#fd6a3e]/5 dark:hover:bg-[#fd6a3e]/10 transition-all duration-200 rounded-lg group"
+              >
                 <Link href="/chat">
                   <div className="mr-3 h-10 w-10 rounded-full bg-gradient-to-br from-[#fd6a3e] to-[#ff8c69] flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
                     <MessageSquare className="h-5 w-5 text-white" />
                   </div>
                   <div className="text-left">
-                    <div className="font-medium text-[#fd6a3e] dark:text-[#fd6a3e]">Chat with Learnbridge AI</div>
-                    <div className="text-xs text-slate-600 dark:text-slate-400">Ask questions</div>
+                    <div className="font-medium text-[#fd6a3e] dark:text-[#fd6a3e]">
+                      Chat with Learnbridge AI
+                    </div>
+                    <div className="text-xs text-slate-600 dark:text-slate-400">
+                      Ask questions
+                    </div>
                   </div>
                   <ChevronRight className="ml-auto h-4 w-4 text-slate-400 group-hover:text-[#022e7d] group-hover:translate-x-1 transition-all" />
                 </Link>
               </Button>
-              
-              <Button asChild variant="ghost" className="w-full justify-start h-14 hover:bg-[#022e7d]/5 dark:hover:bg-[#022e7d]/10 transition-all duration-200 rounded-lg group">
+
+              <Button
+                asChild
+                variant="ghost"
+                className="w-full justify-start h-14 hover:bg-[#022e7d]/5 dark:hover:bg-[#022e7d]/10 transition-all duration-200 rounded-lg group"
+              >
                 <Link href="/quiz">
                   <div className="mr-3 h-10 w-10 rounded-full bg-gradient-to-br from-[#022e7d] to-[#1e3a8a] flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
                     <FileText className="h-5 w-5 text-white" />
                   </div>
                   <div className="text-left">
-                    <div className="font-medium text-[#022e7d] dark:text-[#fd6a3e]">Take Quiz</div>
-                    <div className="text-xs text-slate-600 dark:text-slate-400">Test knowledge</div>
+                    <div className="font-medium text-[#022e7d] dark:text-[#fd6a3e]">
+                      Take Quiz
+                    </div>
+                    <div className="text-xs text-slate-600 dark:text-slate-400">
+                      Test knowledge
+                    </div>
                   </div>
                   <ChevronRight className="ml-auto h-4 w-4 text-slate-400 group-hover:text-[#fd6a3e] group-hover:translate-x-1 transition-all" />
                 </Link>
               </Button>
-              
-              <Button asChild variant="ghost" className="w-full justify-start h-14 hover:bg-[#fd6a3e]/5 dark:hover:bg-[#fd6a3e]/10 transition-all duration-200 rounded-lg group">
+
+              <Button
+                asChild
+                variant="ghost"
+                className="w-full justify-start h-14 hover:bg-[#fd6a3e]/5 dark:hover:bg-[#fd6a3e]/10 transition-all duration-200 rounded-lg group"
+              >
                 <Link href="/settings">
                   <div className="mr-3 h-10 w-10 rounded-full bg-gradient-to-br from-[#fd6a3e] to-[#ff8c69] flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
                     <Settings className="h-5 w-5 text-white" />
                   </div>
                   <div className="text-left">
-                    <div className="font-medium text-[#fd6a3e] dark:text-[#fd6a3e]">Settings</div>
-                    <div className="text-xs text-slate-600 dark:text-slate-400">Preferences</div>
+                    <div className="font-medium text-[#fd6a3e] dark:text-[#fd6a3e]">
+                      Settings
+                    </div>
+                    <div className="text-xs text-slate-600 dark:text-slate-400">
+                      Preferences
+                    </div>
                   </div>
                   <ChevronRight className="ml-auto h-4 w-4 text-slate-400 group-hover:text-[#022e7d] group-hover:translate-x-1 transition-all" />
                 </Link>
@@ -801,36 +950,47 @@ export default function DashboardPage() {
           {/* Recent Activity */}
           <Card className="border-0 shadow-lg overflow-hidden">
             <CardHeader className="bg-gradient-to-r from-[#fd6a3e]/5 via-white to-[#022e7d]/5 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800">
-              <CardTitle className="text-lg font-bold bg-gradient-to-r from-[#fd6a3e] to-[#022e7d] bg-clip-text text-transparent">Recent Activity</CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-400">Your latest learning sessions</CardDescription>
+              <CardTitle className="text-lg font-bold bg-gradient-to-r from-[#fd6a3e] to-[#022e7d] bg-clip-text text-transparent">
+                Recent Activity
+              </CardTitle>
+              <CardDescription className="text-slate-600 dark:text-slate-400">
+                Your latest learning sessions
+              </CardDescription>
             </CardHeader>
             <CardContent className="p-4">
               <ScrollArea className="h-[300px] pr-4">
                 {recentActivity.length > 0 ? (
                   <div className="space-y-4">
                     {recentActivity.map((activity) => (
-                      <div key={activity.id} className="flex items-start gap-3 p-4 rounded-lg bg-gradient-to-r from-white to-white/80 dark:from-slate-800/60 dark:to-slate-800/40 hover:shadow-md transition-all duration-300 border border-slate-200 dark:border-slate-700/50 hover:border-[#fd6a3e]/30 dark:hover:border-[#022e7d]/30 group">
+                      <div
+                        key={activity.id}
+                        className="flex items-start gap-3 p-4 rounded-lg bg-gradient-to-r from-white to-white/80 dark:from-slate-800/60 dark:to-slate-800/40 hover:shadow-md transition-all duration-300 border border-slate-200 dark:border-slate-700/50 hover:border-[#fd6a3e]/30 dark:hover:border-[#022e7d]/30 group"
+                      >
                         <div className="h-10 w-10 rounded-full shadow-md flex items-center justify-center group-hover:scale-110 transition-transform">
-                          {activity.type === 'flashcard' && (
+                          {activity.type === "flashcard" && (
                             <div className="h-full w-full rounded-full bg-gradient-to-br from-[#022e7d] to-[#1e3a8a] flex items-center justify-center">
                               <BookOpen className="h-5 w-5 text-white" />
                             </div>
                           )}
-                          {activity.type === 'chat' && (
+                          {activity.type === "chat" && (
                             <div className="h-full w-full rounded-full bg-gradient-to-br from-[#fd6a3e] to-[#ff8c69] flex items-center justify-center">
                               <MessageSquare className="h-5 w-5 text-white" />
                             </div>
                           )}
-                          {activity.type === 'quiz' && (
+                          {activity.type === "quiz" && (
                             <div className="h-full w-full rounded-full bg-gradient-to-br from-[#022e7d] to-[#1e3a8a] flex items-center justify-center">
                               <FileText className="h-5 w-5 text-white" />
                             </div>
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate group-hover:text-[#022e7d] dark:group-hover:text-[#fd6a3e] transition-colors">{activity.title}</p>
+                          <p className="font-medium text-sm truncate group-hover:text-[#022e7d] dark:group-hover:text-[#fd6a3e] transition-colors">
+                            {activity.title}
+                          </p>
                           {activity.details && (
-                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-2">{activity.details}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-2">
+                              {activity.details}
+                            </p>
                           )}
                           <p className="text-xs text-slate-500 dark:text-slate-500 mt-2 flex items-center gap-1">
                             <Clock className="h-3 w-3 text-[#fd6a3e]" />
@@ -845,8 +1005,12 @@ export default function DashboardPage() {
                     <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-[#022e7d]/20 to-[#fd6a3e]/20 dark:from-[#022e7d]/30 dark:to-[#fd6a3e]/30 flex items-center justify-center shadow-md">
                       <Brain className="h-8 w-8 text-slate-400 dark:text-slate-500" />
                     </div>
-                    <p className="text-sm font-medium text-[#022e7d] dark:text-[#fd6a3e]">No recent activity</p>
-                    <p className="text-xs mt-1 text-slate-600 dark:text-slate-400">Start learning to see your progress here</p>
+                    <p className="text-sm font-medium text-[#022e7d] dark:text-[#fd6a3e]">
+                      No recent activity
+                    </p>
+                    <p className="text-xs mt-1 text-slate-600 dark:text-slate-400">
+                      Start learning to see your progress here
+                    </p>
                   </div>
                 )}
               </ScrollArea>
@@ -865,42 +1029,52 @@ export default function DashboardPage() {
             date_of_birth: data.date_of_birth,
             grade_level: data.grade_level,
             subjects_of_interest: data.subjects_of_interest,
-            has_completed_onboarding: true
+            has_completed_onboarding: true,
           });
-          
+
           if (result.success) {
-            setProfile(prev => prev ? { ...prev, ...data, has_completed_onboarding: true } : null);
+            setProfile((prev) =>
+              prev ? { ...prev, ...data, has_completed_onboarding: true } : null
+            );
             toast.success("Profile updated successfully!");
           } else {
-            toast.error("Failed to update profile", { description: result.error });
+            toast.error("Failed to update profile", {
+              description: result.error,
+            });
           }
         }}
       />
 
       {/* Learning Plan Generator with brand styling */}
       {showLearningPlanGenerator && (
-        <Dialog open={showLearningPlanGenerator} onOpenChange={setShowLearningPlanGenerator}>
+        <Dialog
+          open={showLearningPlanGenerator}
+          onOpenChange={setShowLearningPlanGenerator}
+        >
           <DialogContent className="bg-gradient-to-br from-white to-white/95 dark:from-slate-900 dark:to-slate-900/95 max-w-2xl">
             <DialogHeader className="bg-gradient-to-r from-[#fd6a3e]/5 via-white to-[#022e7d]/5 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800 p-4 -m-4 mb-4 rounded-t-lg">
               <DialogTitle className="text-xl font-bold bg-gradient-to-r from-[#022e7d] to-[#fd6a3e] bg-clip-text text-transparent">
                 Generate Your Learning Plan
               </DialogTitle>
               <DialogDescription className="text-slate-600 dark:text-slate-400">
-                Nova will create a personalized learning plan based on your interests and goals
+                Nova will create a personalized learning plan based on your
+                interests and goals
               </DialogDescription>
             </DialogHeader>
             <LearningPlanGenerator
               onPlanGenerated={(plan) => {
                 if (plan) {
                   setLearningPlan(plan);
-                  saveActiveLearningPlanAction(plan).then(result => {
+                  saveActiveLearningPlanAction(plan).then((result) => {
                     if (result.success) {
                       setActivePlan(plan);
                       setCompletedSteps([]);
                       toast.success("Learning plan created!");
                       setShowLearningPlanGenerator(false);
                     } else {
-                      toast.error("Failed to save learning plan", { description: result.error });
+                      toast.error("Failed to save learning plan", {
+                        description: result.error,
+                      });
                     }
                   });
                 }
