@@ -208,12 +208,9 @@ export default function Navbar() {
           <Link href="/" className="mr-6 flex items-center space-x-2">
             <img
               src="/LearnBridge logo inverted2.png"
-              alt="CogniSpark AI Logo"
+              alt="Logo"
               className="h-12"
             />
-            <span className="font-bold text-lg bg-gradient-to-r from-[#022e7d] to-[#fd6a3e] bg-clip-text text-transparent">
-              CogniSpark AI
-            </span>
           </Link>
         </div>
       </header>
@@ -260,12 +257,9 @@ export default function Navbar() {
           >
             <img
               src="/LearnBridge logo inverted2.png"
-              alt="CogniSpark AI Logo"
+              alt="Logo"
               className="h-12"
             />
-            <span className="font-bold text-lg bg-gradient-to-r from-[#022e7d] to-[#fd6a3e] bg-clip-text text-transparent">
-              CogniSpark AI
-            </span>
           </Link>
 
           {/* Desktop Navigation */}

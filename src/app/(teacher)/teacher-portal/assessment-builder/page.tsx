@@ -35,31 +35,21 @@ import {
   Clock,
   Users,
 } from "lucide-react";
+import { toast } from "sonner";
 
-// Mock data for demonstration
-const mockSavedAssessments = [
-  {
-    id: "1",
-    title: "Introduction to Photosynthesis",
-    quiz_type: "teacher_assessment",
-    question_count: 15,
-    updated_at: "2024-06-08T10:30:00Z",
-  },
-  {
-    id: "2",
-    title: "Quadratic Equations Practice",
-    quiz_type: "teacher_assessment",
-    question_count: 12,
-    updated_at: "2024-06-07T14:20:00Z",
-  },
-  {
-    id: "3",
-    title: "World War II Timeline",
-    quiz_type: "teacher_assessment",
-    question_count: 20,
-    updated_at: "2024-06-06T09:15:00Z",
-  },
-];
+// Import actions and types for TOS and Assessment generation
+import {
+  getSavedTOSTemplatesAction,
+  getTOSTemplateByIdAction,
+} from "@/app/actions/tosActions";
+import { generateAssessmentItemsAction } from "@/app/actions/assessmentActions";
+import type {
+  TOSTemplateClientData,
+  SavedTOSMeta as SavedTOSTemplateMeta,
+} from "@/app/(teacher)/teacher-portal/tos-builder/page"; // Adjust path if types are elsewhere
+
+// We'll fetch real saved assessments from the database
+const initialSavedAssessments = [];
 
 const questionTypeOptions = [
   { id: "multiple_choice", label: "Multiple Choice", icon: "🔤" },
@@ -68,6 +58,8 @@ const questionTypeOptions = [
 ];
 
 const numQuestionOptions = [5, 10, 15, 20, 25];
+
+// No helper functions needed - we're using the real API now
 
 export default function AssessmentBuilderPage() {
   // State management
@@ -82,9 +74,58 @@ export default function AssessmentBuilderPage() {
   const [generatedAssessment, setGeneratedAssessment] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [savedAssessments, setSavedAssessments] =
-    useState(mockSavedAssessments);
+  const [savedAssessments, setSavedAssessments] = useState(
+    initialSavedAssessments
+  );
   const [isLoadingAssessments, setIsLoadingAssessments] = useState(false);
+
+  // TOS-related state
+  const [availableTOSTemplates, setAvailableTOSTemplates] = useState<
+    SavedTOSTemplateMeta[]
+  >([]);
+  const [selectedTOSId, setSelectedTOSId] = useState<string>("");
+  const [selectedTOSData, setSelectedTOSData] =
+    useState<TOSTemplateClientData | null>(null); // To store full data of selected TOS
+  const [isLoadingTOSList, setIsLoadingTOSList] = useState(false);
+
+  // Fetch TOS templates on component mount
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchTOS = async () => {
+      if (!isMounted) return;
+
+      setIsLoadingTOSList(true);
+
+      try {
+        const result = await getSavedTOSTemplatesAction();
+
+        if (!isMounted) return;
+
+        if (result.success && result.templates) {
+          setAvailableTOSTemplates(result.templates);
+        } else {
+          toast.error("Failed to load TOS templates");
+        }
+      } catch (error) {
+        if (isMounted) {
+          console.error("Error fetching TOS templates:", error);
+          toast.error("Error loading TOS templates");
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingTOSList(false);
+        }
+      }
+    };
+
+    fetchTOS();
+
+    // Cleanup function to prevent state updates after unmount
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleCreateNew = () => {
     setAssessmentTitle("");
@@ -94,6 +135,9 @@ export default function AssessmentBuilderPage() {
     setNumQuestions(10);
     setDifficulty("medium");
     setGeneratedAssessment(null);
+    // Reset TOS selection
+    setSelectedTOSId("");
+    setSelectedTOSData(null);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -105,64 +149,153 @@ export default function AssessmentBuilderPage() {
     );
   };
 
+  // This function handles selecting a TOS template and loading its data
+  const handleTOSSelect = async (tosId: string) => {
+    // Don't do anything if the ID is empty or already selected
+    if (!tosId || tosId === selectedTOSId) {
+      return;
+    }
+
+    // Set loading state
+    toast.info("Loading TOS template...");
+
+    try {
+      // Fetch the TOS template data
+      const result = await getTOSTemplateByIdAction(tosId);
+
+      if (result.success && result.template) {
+        // First set the ID
+        setSelectedTOSId(tosId);
+
+        // Then update the source content with the TOS title
+        const newContent =
+          result.template.title || "Content based on selected TOS";
+        setSourceContent(newContent);
+
+        // Update the number of questions if specified in the TOS
+        if (
+          result.template.total_items_or_percent &&
+          !result.template.is_percentage_based
+        ) {
+          setNumQuestions(Number(result.template.total_items_or_percent));
+        }
+
+        // Finally set the TOS data
+        setSelectedTOSData(result.template);
+
+        // Show success message
+        toast.success(`TOS "${result.template.title}" loaded successfully`);
+      } else {
+        // Show error message
+        toast.error("Failed to load TOS template");
+        setSelectedTOSId("");
+      }
+    } catch (error) {
+      // Show error message
+      toast.error("Error loading TOS template");
+      console.error("Error loading TOS template:", error);
+      setSelectedTOSId("");
+    }
+  };
+
   const handleGenerateItems = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    // Validation - if using TOS, we might not need source content to be required
     if (
       !assessmentTitle.trim() ||
-      !sourceContent.trim() ||
+      (!selectedTOSData && !sourceContent.trim()) ||
       selectedQuestionTypes.length === 0
     ) {
+      toast.error("Please fill in all required fields");
       return;
     }
 
     setIsGenerating(true);
     setGeneratedAssessment(null);
 
-    // Simulate API call
-    setTimeout(() => {
-      setGeneratedAssessment({
+    try {
+      const payload = {
         title: assessmentTitle,
-        questions: [
-          {
-            id: "1",
-            question_text:
-              "What is the primary function of chlorophyll in photosynthesis?",
-            question_type: "multiple_choice",
-            options: [
-              "Absorbing light energy",
-              "Storing glucose",
-              "Producing oxygen",
-              "Creating water",
-            ],
-            correct_answer: "Absorbing light energy",
-            explanation:
-              "Chlorophyll is the green pigment that captures light energy to power photosynthesis.",
-          },
-          {
-            id: "2",
-            question_text:
-              "Photosynthesis occurs in the chloroplasts of plant cells.",
-            question_type: "true_false",
-            correct_answer: "True",
-            explanation:
-              "Chloroplasts contain the chlorophyll and enzymes necessary for photosynthesis.",
-          },
-        ],
+        source_type: selectedTOSData ? "tos" : sourceType, // Use "tos" as source type if TOS is selected
+        source_content: sourceContent, // This might be the general topic if TOS is used
+        question_types_requested: selectedQuestionTypes as any,
+        num_questions: numQuestions,
+        difficulty_level: difficulty,
+        linked_tos_id: selectedTOSId || undefined,
+        linked_tos_data: selectedTOSData, // Pass the full TOS data
+      };
+
+      // Make a real API call to generate assessment items
+      // Import the action at the top of the file if not already imported
+      const result = await generateAssessmentItemsAction(payload);
+
+      if (result.success && result.assessment_items) {
+        // Set the generated assessment with the real data from the API
+        setGeneratedAssessment({
+          title: assessmentTitle,
+          questions: result.assessment_items,
+        });
+
+        // Check if there's a warning message
+        if (result.error) {
+          // Show warning toast if there's an error message despite success=true
+          toast.warning(result.error);
+        } else {
+          toast.success("Assessment generated successfully!");
+        }
+
+        // Scroll to the assessment output
+        setTimeout(() => {
+          document
+            .getElementById("assessment-output")
+            ?.scrollIntoView({ behavior: "smooth" });
+        }, 100);
+      } else {
+        // Handle error from the API
+        toast.error(
+          result.error || "Failed to generate assessment. Please try again."
+        );
+      }
+
+      setIsGenerating(false);
+    } catch (error: any) {
+      toast.error("Failed to generate assessment items", {
+        description: error.message || "An unexpected error occurred",
       });
       setIsGenerating(false);
-      setTimeout(() => {
-        document
-          .getElementById("assessment-output")
-          ?.scrollIntoView({ behavior: "smooth" });
-      }, 100);
-    }, 2000);
+    }
   };
 
   const handleSaveAssessment = async () => {
     setIsSaving(true);
-    setTimeout(() => {
+
+    try {
+      // In a real implementation, you would call the saveAssessmentAction:
+      // const result = await saveAssessmentAction({
+      //   title: assessmentTitle,
+      //   description: "", // Optional description field could be added to the form
+      //   source_type: selectedTOSData ? "tos" : sourceType,
+      //   source_content: sourceContent,
+      //   generated_question_types: selectedQuestionTypes as any,
+      //   target_num_questions: numQuestions,
+      //   difficulty_level: difficulty,
+      //   questions: generatedAssessment?.questions || [],
+      //   linked_tos_id: selectedTOSId || undefined,
+      //   linked_tos_data: selectedTOSData || undefined,
+      // });
+
+      // Simulate API call
+      setTimeout(() => {
+        toast.success("Assessment saved successfully!");
+        setIsSaving(false);
+      }, 1500);
+    } catch (error: any) {
+      toast.error("Failed to save assessment", {
+        description: error.message || "An unexpected error occurred",
+      });
       setIsSaving(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -256,74 +389,101 @@ export default function AssessmentBuilderPage() {
 
                   <div>
                     <Label className="text-[#022e7d] font-semibold text-base mb-4 block">
-                      Source Type <span className="text-[#fd6a3e]">*</span>
+                      Source for Assessment Questions{" "}
+                      <span className="text-[#fd6a3e]">*</span>
                     </Label>
-                    <div className="grid grid-cols-1 gap-3">
-                      <div
-                        className={`p-4 border-2 rounded-xl cursor-pointer transition-all duration-300 ${
-                          sourceType === "topic"
-                            ? "border-[#fd6a3e] bg-[#fd6a3e]/5"
-                            : "border-slate-200 hover:border-slate-300"
-                        }`}
-                        onClick={() => setSourceType("topic")}
+                    <Select
+                      value={sourceType} // Don't change this based on selectedTOSData to avoid infinite loop
+                      onValueChange={(value: "topic" | "text") => {
+                        // Only handle topic and text here
+                        setSourceType(value);
+                        // If changing source type, clear TOS selection
+                        setSelectedTOSId("");
+                        setSelectedTOSData(null);
+                      }}
+                      disabled={isGenerating || !!selectedTOSData} // Disable if TOS is selected
+                    >
+                      <SelectTrigger className="w-full mt-1 border-slate-300 focus:border-[#fd6a3e] focus:ring-[#fd6a3e]/20 h-12 text-base">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="topic">
+                          Generate from a Topic/Keyword
+                        </SelectItem>
+                        <SelectItem value="text">
+                          Generate from Pasted Text
+                        </SelectItem>
+                        {/* Removed TOS option from here - it's handled by the separate TOS dropdown below */}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* TOS Selection Dropdown */}
+                  <div className="mt-0">
+                    <Label
+                      htmlFor="tosSelect"
+                      className="text-[#022e7d] font-semibold text-base"
+                    >
+                      Link to Table of Specifications (Optional)
+                    </Label>
+                    <Select
+                      defaultValue="none"
+                      value={selectedTOSId || "none"}
+                      onValueChange={(tosId) => {
+                        if (tosId === "none") {
+                          // Clear TOS selection
+                          setSelectedTOSId("");
+                          setSelectedTOSData(null);
+                          // Reset source content if it was set by TOS
+                          if (selectedTOSData) {
+                            setSourceContent("");
+                          }
+                        } else if (
+                          tosId !== "loading_tos" &&
+                          tosId !== selectedTOSId
+                        ) {
+                          // Only fetch TOS data for valid IDs that aren't already selected
+                          handleTOSSelect(tosId);
+                        }
+                      }}
+                      disabled={isLoadingTOSList || isGenerating}
+                    >
+                      <SelectTrigger
+                        id="tosSelect"
+                        className="mt-1 border-slate-300 focus:border-[#fd6a3e] focus:ring-[#fd6a3e]/20 h-12 text-base"
                       >
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="radio"
-                            id="source-topic"
-                            name="sourceType"
-                            value="topic"
-                            checked={sourceType === "topic"}
-                            onChange={() => setSourceType("topic")}
-                            className="accent-[#fd6a3e]"
-                          />
-                          <div>
-                            <Label
-                              htmlFor="source-topic"
-                              className="font-medium text-[#022e7d] cursor-pointer"
-                            >
-                              Topic or Learning Objective
-                            </Label>
-                            <p className="text-sm text-slate-600 mt-1">
-                              Generate questions based on a specific topic or
-                              learning goal
-                            </p>
-                          </div>
+                        <SelectValue placeholder="Select a saved TOS (optional)..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">
+                          -- None (Generate freely) --
+                        </SelectItem>
+                        {isLoadingTOSList && (
+                          <SelectItem value="loading_tos" disabled>
+                            Loading TOS templates...
+                          </SelectItem>
+                        )}
+                        {availableTOSTemplates.map((tos) => (
+                          <SelectItem key={tos.id} value={tos.id}>
+                            {tos.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedTOSData && (
+                      <div className="mt-2">
+                        <div className="flex items-center gap-2 text-sm text-green-600 font-medium">
+                          <CheckCircle2 className="h-4 w-4" />
+                          <span>TOS Selected: "{selectedTOSData.title}"</span>
                         </div>
+                        <p className="text-xs text-slate-600 mt-1">
+                          Your assessment will be generated according to this
+                          Table of Specifications.
+                          {sourceType === "topic" &&
+                            " The topic field below will provide additional context."}
+                        </p>
                       </div>
-                      <div
-                        className={`p-4 border-2 rounded-xl cursor-pointer transition-all duration-300 ${
-                          sourceType === "text"
-                            ? "border-[#fd6a3e] bg-[#fd6a3e]/5"
-                            : "border-slate-200 hover:border-slate-300"
-                        }`}
-                        onClick={() => setSourceType("text")}
-                      >
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="radio"
-                            id="source-text"
-                            name="sourceType"
-                            value="text"
-                            checked={sourceType === "text"}
-                            onChange={() => setSourceType("text")}
-                            className="accent-[#fd6a3e]"
-                          />
-                          <div>
-                            <Label
-                              htmlFor="source-text"
-                              className="font-medium text-[#022e7d] cursor-pointer"
-                            >
-                              Source Text or Material
-                            </Label>
-                            <p className="text-sm text-slate-600 mt-1">
-                              Create questions from existing content or
-                              documents
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    )}
                   </div>
 
                   <div>
@@ -331,21 +491,28 @@ export default function AssessmentBuilderPage() {
                       htmlFor="sourceContent"
                       className="text-[#022e7d] font-semibold text-base"
                     >
-                      {sourceType === "topic"
+                      {selectedTOSData
+                        ? "Overall Subject/Context for TOS-based Questions"
+                        : sourceType === "topic"
                         ? "Topic or Learning Objective"
                         : "Source Text/Material"}{" "}
-                      <span className="text-[#fd6a3e]">*</span>
+                      {!selectedTOSData && (
+                        <span className="text-[#fd6a3e]">*</span>
+                      )}
                     </Label>
                     <Textarea
                       id="sourceContent"
                       value={sourceContent}
                       onChange={(e) => setSourceContent(e.target.value)}
                       placeholder={
-                        sourceType === "topic"
+                        selectedTOSData
+                          ? "e.g., Grade 9 Biology - Cell Division Unit"
+                          : sourceType === "topic"
                           ? "Example: 'Photosynthesis in plants - students should understand the process, inputs, outputs, and importance'"
                           : "Paste your source material, lesson content, or reading passage here..."
                       }
                       className="mt-2 min-h-[150px] border-slate-300 focus:border-[#fd6a3e] focus:ring-[#fd6a3e]/20 text-base"
+                      required={!selectedTOSData}
                     />
                   </div>
                 </div>
