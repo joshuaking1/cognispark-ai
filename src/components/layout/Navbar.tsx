@@ -18,7 +18,7 @@ import {
   Loader2,
   Settings,
   BookOpenCheck,
-  ChalkboardTeacher,
+  GraduationCap, // Using GraduationCap instead of ChalkboardTeacher
   Settings2,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -58,7 +58,7 @@ const baseNavItems = [
 
 // Additional items for teachers
 const teacherNavItems = [
-  { href: "/teacher-portal", label: "Teacher Portal", icon: ChalkboardTeacher },
+  { href: "/teacher-portal", label: "Teacher Portal", icon: GraduationCap },
 ];
 
 // Additional items for admins
@@ -371,63 +371,75 @@ export default function Navbar() {
                 </SheetContent>
               </Sheet>
 
-              {/* Desktop User Menu */}
+              {/* User Menu - Desktop */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    className="hidden lg:flex items-center gap-2 h-10 px-3 hover:bg-gradient-to-r hover:from-orange-50 hover:to-blue-50 dark:hover:from-slate-800 dark:hover:to-slate-700 transition-all duration-300 rounded-xl border border-transparent hover:border-[#fd6a3e]/20"
+                    size="sm"
+                    className="flex items-center gap-2 hover:bg-gradient-to-r hover:from-orange-50 hover:to-blue-50 dark:hover:from-slate-800 dark:hover:to-slate-700 transition-all duration-300 rounded-xl border border-transparent hover:border-[#fd6a3e]/20"
                   >
-                    {userProfile?.avatar_url ||
-                    user.user_metadata?.avatar_url ? (
-                      <Avatar className="h-7 w-7 ring-2 ring-gradient-to-r ring-[#fd6a3e]/30">
+                    <Avatar className="h-8 w-8 border-2 border-white/20 shadow-md">
+                      {userProfile?.avatar_url ? (
                         <AvatarImage
-                          src={
-                            userProfile?.avatar_url ||
-                            user.user_metadata?.avatar_url
-                          }
-                          alt={userProfile?.full_name || user.email || "User"}
+                          src={userProfile.avatar_url}
+                          alt={userProfile.full_name || "User"}
                         />
-                        <AvatarFallback className="bg-gradient-to-br from-[#fd6a3e] to-[#022e7d] text-white text-xs font-semibold">
+                      ) : (
+                        <AvatarFallback className="bg-gradient-to-br from-[#022e7d] to-[#fd6a3e] text-white">
                           {userProfile?.full_name
-                            ? userProfile.full_name.charAt(0).toUpperCase()
-                            : user.email?.charAt(0).toUpperCase()}
+                            ? userProfile.full_name
+                                .split(" ")
+                                .map((n) => n[0])
+                                .join("")
+                                .toUpperCase()
+                                .substring(0, 2)
+                            : "U"}
                         </AvatarFallback>
-                      </Avatar>
-                    ) : (
-                      <div className="p-1.5 rounded-full bg-gradient-to-br from-[#fd6a3e] to-[#022e7d]">
-                        <UserCircle2 className="h-4 w-4 text-white" />
-                      </div>
-                    )}
-                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300 max-w-[100px] truncate">
-                      {userProfile?.full_name ||
-                        user.email?.split("@")[0] ||
-                        "User"}
+                      )}
+                    </Avatar>
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300 hidden md:inline-block">
+                      {userProfile?.full_name || "User"}
                     </span>
-                    <ChevronDown className="h-3 w-3 text-slate-500" />
+                    <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   align="end"
-                  className="w-56 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-[#fd6a3e]/20 dark:border-slate-700/40 shadow-xl rounded-xl"
+                  className="w-56 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-[#fd6a3e]/20 dark:border-slate-700/40 shadow-xl"
                 >
-                  <DropdownMenuLabel className="text-slate-900 dark:text-slate-100 font-semibold">
+                  <DropdownMenuLabel className="bg-gradient-to-r from-[#022e7d] to-[#fd6a3e] bg-clip-text text-transparent font-medium">
                     My Account
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator className="bg-gradient-to-r from-[#fd6a3e]/20 to-[#022e7d]/20" />
                   <DropdownMenuItem
+                    className="cursor-pointer hover:bg-gradient-to-r hover:from-slate-50 hover:to-orange-50 dark:hover:from-slate-800 dark:hover:to-slate-700 transition-all duration-300"
+                    onClick={() => router.push("/profile")}
+                  >
+                    <UserCircle2 className="h-4 w-4 mr-2" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer hover:bg-gradient-to-r hover:from-slate-50 hover:to-orange-50 dark:hover:from-slate-800 dark:hover:to-slate-700 transition-all duration-300"
+                    onClick={() => router.push("/settings")}
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-gradient-to-r from-red-200/40 to-red-300/40" />
+                  <DropdownMenuItem
+                    className="cursor-pointer text-red-600 hover:text-red-700 hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 dark:text-red-400 dark:hover:text-red-300 dark:hover:from-red-950/30 dark:hover:to-red-900/30 transition-all duration-300"
                     onClick={handleSignOut}
-                    className="text-red-600 dark:text-red-400 hover:bg-gradient-to-r hover:from-red-50 hover:to-red-100 dark:hover:from-red-950/30 dark:hover:to-red-900/30 cursor-pointer gap-2 rounded-lg"
                     disabled={isSigningOut}
                   >
                     {isSigningOut ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         Signing Out...
                       </>
                     ) : (
                       <>
-                        <LogOut className="h-4 w-4" />
+                        <LogOut className="h-4 w-4 mr-2" />
                         Sign Out
                       </>
                     )}
@@ -436,26 +448,23 @@ export default function Navbar() {
               </DropdownMenu>
             </>
           ) : (
-            pathname !== "/login" &&
-            pathname !== "/signup" && (
-              <div className="flex items-center gap-3">
-                <Button
-                  asChild
-                  variant="ghost"
-                  size="sm"
-                  className="text-slate-600 dark:text-slate-300 hover:text-[#022e7d] dark:hover:text-white hover:bg-gradient-to-r hover:from-orange-50 hover:to-blue-50 dark:hover:from-slate-800 dark:hover:to-slate-700 transition-all duration-300 rounded-xl border border-transparent hover:border-[#fd6a3e]/20"
-                >
-                  <Link href="/login">Login</Link>
-                </Button>
-                <Button
-                  asChild
-                  size="sm"
-                  className="bg-gradient-to-r from-[#fd6a3e] to-[#022e7d] hover:from-[#ff7a52] hover:to-[#1a4ba6] text-white border-0 shadow-lg hover:shadow-xl hover:shadow-[#fd6a3e]/30 transition-all duration-300 transform hover:scale-105 rounded-xl font-semibold"
-                >
-                  <Link href="/signup">Sign Up</Link>
-                </Button>
-              </div>
-            )
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-slate-700 dark:text-slate-300 hover:text-[#022e7d] dark:hover:text-white hover:bg-gradient-to-r hover:from-slate-50 hover:to-orange-50 dark:hover:from-slate-800 dark:hover:to-slate-700 transition-all duration-300 rounded-xl border border-transparent hover:border-[#fd6a3e]/20"
+                onClick={() => router.push("/login")}
+              >
+                Log In
+              </Button>
+              <Button
+                size="sm"
+                className="bg-gradient-to-r from-[#022e7d] to-[#fd6a3e] text-white hover:from-[#022e7d] hover:to-[#fd6a3e] hover:shadow-lg hover:shadow-[#022e7d]/25 transition-all duration-300 rounded-xl"
+                onClick={() => router.push("/signup")}
+              >
+                Sign Up
+              </Button>
+            </div>
           )}
         </div>
       </div>

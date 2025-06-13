@@ -9,6 +9,44 @@ if (!groqApiKey)
   console.error("CRITICAL: GROQ_API_KEY for essay actions is not set.");
 const groq = groqApiKey ? new Groq({ apiKey: groqApiKey }) : null;
 
+// Helper function to verify user is authenticated
+async function verifyUser() {
+  try {
+    const supabase = createSupabaseServerActionClient();
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+    if (error) return { user: null, error: "Authentication failed" };
+    return { user, error: null };
+  } catch (e) {
+    return { user: null, error: "Authentication check failed" };
+  }
+}
+
+// Helper function to verify teacher role
+async function verifyTeacher() {
+  try {
+    const { user, error } = await verifyUser();
+    if (error || !user) return { user: null, error: "Authentication failed" };
+
+    const supabase = createSupabaseServerActionClient();
+    const { data, error: roleError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (roleError) return { user: null, error: "Role verification failed" };
+    if (data?.role !== "teacher")
+      return { user: null, error: "Teacher role required" };
+
+    return { user, error: null };
+  } catch (e) {
+    return { user: null, error: "Teacher verification failed" };
+  }
+}
+
 interface BrainstormResult {
   success: boolean;
   ideas?: string[];
@@ -29,6 +67,7 @@ interface OutlineResult {
 
 // Ensure FeedbackPointForServer matches the client's FeedbackPoint for structure expected from AI
 interface FeedbackPointForServer {
+  id?: string;
   area: string;
   comment: string;
   original_text_segment?: string;
@@ -334,13 +373,62 @@ Generate the JSON object now.`;
 }
 
 // --- Paragraph Feedback Action ---
+// Shared feedback categories with client
+const feedbackCategories = [
+  // General Paragraph Level (can still be selected)
+  {
+    id: "overall_clarity_conciseness",
+    label: "Overall Clarity & Conciseness",
+    type: "paragraph",
+  },
+  {
+    id: "overall_argument_strength",
+    label: "Overall Argument Strength & Support",
+    type: "paragraph",
+  },
+  {
+    id: "overall_flow_cohesion",
+    label: "Overall Flow & Cohesion",
+    type: "paragraph",
+  },
+  {
+    id: "overall_style_tone",
+    label: "Overall Style & Tone Consistency",
+    type: "paragraph",
+  },
+  // Granular/Sentence Level (more relevant when text is selected)
+  {
+    id: "grammar_spelling_selection",
+    label: "Grammar & Spelling (for selection)",
+    type: "selection",
+  },
+  {
+    id: "word_choice_selection",
+    label: "Word Choice & Vocabulary (for selection)",
+    type: "selection",
+  },
+  {
+    id: "sentence_structure_selection",
+    label: "Sentence Structure & Variety (for selection)",
+    type: "selection",
+  },
+  {
+    id: "passive_voice_selection",
+    label: "Passive Voice Usage (for selection)",
+    type: "selection",
+  },
+];
+
 export async function getParagraphFeedbackAction(
   paragraphText: string,
-  feedbackTypes: string[],
-  selectedTextSnippet?: string, // NEW: Specific text snippet for focused feedback
+  feedbackTypes: string[], // Array of category IDs like "grammar_spelling_selection"
+  selectedTextSnippet?: string, // The highlighted text
   essayTopic?: string,
   essayType?: string
 ): Promise<FeedbackResult> {
+  const authCheck = await verifyTeacher();
+  if (authCheck.error || !authCheck.user)
+    return { success: false, error: authCheck.error };
   if (!groq) return { success: false, error: "AI Service not configured." };
   if (!paragraphText.trim())
     return { success: false, error: "Paragraph text is required." };
@@ -350,239 +438,190 @@ export async function getParagraphFeedbackAction(
       error: "At least one feedback type must be selected.",
     };
 
-  // Personalization: Fetch user profile
-  let personalizationContext = "";
-  try {
-    const supabase = createSupabaseServerActionClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-    if (!authError && user) {
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("grade_level, subjects_of_interest, date_of_birth, full_name")
-        .eq("id", user.id)
-        .single();
-      if (profileData) {
-        if (profileData.full_name) {
-          personalizationContext += ` The student's name is ${profileData.full_name}.`;
-        }
-        if (
-          profileData.grade_level &&
-          profileData.grade_level !== "Not Specified"
-        ) {
-          personalizationContext += ` The feedback should be appropriate for a ${profileData.grade_level} student.`;
-        }
-        if (profileData.date_of_birth) {
-          personalizationContext += ` The student was born on ${profileData.date_of_birth}. Use this to further tailor the feedback if relevant.`;
-        }
-        if (
-          profileData.subjects_of_interest &&
-          (profileData.subjects_of_interest as string[]).length > 0
-        ) {
-          personalizationContext += ` If possible, relate the feedback to topics like ${(
-            profileData.subjects_of_interest as string[]
-          ).join(", ")}.`;
-        }
-      }
-    }
-  } catch (e) {
-    /* Ignore personalization errors */
-  }
+  const supabase = createSupabaseServerActionClient(); // For profile fetching
+  const { data: profileData } = await supabase
+    .from("profiles")
+    .select("grade_level")
+    .eq("id", authCheck.user.id)
+    .single();
 
-  // Updated feedback categories to match the new granular system
-  const feedbackCategories = [
-    // General Paragraph Level (can still be selected)
-    {
-      id: "overall_clarity_conciseness",
-      label: "Overall Clarity & Conciseness",
-      type: "paragraph",
-    },
-    {
-      id: "overall_argument_strength",
-      label: "Overall Argument Strength & Support",
-      type: "paragraph",
-    },
-    {
-      id: "overall_flow_cohesion",
-      label: "Overall Flow & Cohesion",
-      type: "paragraph",
-    },
-    {
-      id: "overall_style_tone",
-      label: "Overall Style & Tone Consistency",
-      type: "paragraph",
-    },
-    // Granular/Sentence Level (more relevant when text is selected)
-    {
-      id: "grammar_spelling_selection",
-      label: "Grammar & Spelling (for selection)",
-      type: "selection",
-    },
-    {
-      id: "word_choice_selection",
-      label: "Word Choice & Vocabulary (for selection)",
-      type: "selection",
-    },
-    {
-      id: "sentence_structure_selection",
-      label: "Sentence Structure & Variety (for selection)",
-      type: "selection",
-    },
-    {
-      id: "passive_voice_selection",
-      label: "Passive Voice Usage (for selection)",
-      type: "selection",
-    },
-  ];
+  const personalizationContext =
+    profileData?.grade_level && profileData.grade_level !== "Not Specified"
+      ? `The student providing this text is in ${profileData.grade_level}. Tailor your feedback complexity and examples accordingly.`
+      : "The student is likely high school level. Tailor your feedback complexity and examples accordingly.";
 
   const selectedFeedbackLabels = feedbackTypes
     .map((id) => {
       const category = feedbackCategories.find((cat) => cat.id === id);
-      return category ? category.label : id.replace(/_/g, " ");
+      return category
+        ? category.label
+        : id.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
     })
     .join(", ");
 
-  let mainInstruction = "";
-  let focusTextInstruction = "";
+  let focusInstruction = "";
+  let mainAnalysisInstruction = `Please analyze the ENTIRE paragraph text provided below based on all the selected feedback categories: ${selectedFeedbackLabels}.`;
 
   if (selectedTextSnippet && selectedTextSnippet.trim() !== "") {
-    focusTextInstruction = `
-The student has SPECIFICALLY HIGHLIGHTED the following text segment for focused feedback:
+    focusInstruction = `
+The student has also SPECIFICALLY HIGHLIGHTED the following text segment for focused feedback:
 ---BEGIN HIGHLIGHTED TEXT---
 ${selectedTextSnippet.trim()}
 ---END HIGHLIGHTED TEXT---
+For any feedback categories that explicitly mention "(for selection)" or seem most relevant to a specific phrase (like "Word Choice", "Sentence Structure", "Passive Voice Usage"), your feedback MUST primarily address this HIGHLIGHTED segment.
+When providing feedback on this highlighted segment:
+- Accurately quote this segment in the "original_text_segment" field of your JSON response.
+- Make it clear in your "comment" that this particular piece of feedback refers to their selection.`;
 
-For any feedback categories that are selection-focused (e.g., "Grammar & Spelling (for selection)", "Word Choice & Vocabulary (for selection)"), your feedback MUST primarily address this highlighted segment. Quote this segment in your 'original_text_segment' field for such feedback.
-`;
-    mainInstruction = `Please analyze the ENTIRE paragraph text provided below first for any selected "Overall" feedback categories. THEN, provide very focused feedback on the HIGHLIGHTED TEXT segment based on the selection-focused categories chosen by the student.`;
-  } else {
-    mainInstruction = `Please analyze the ENTIRE paragraph text provided below based on all the selected feedback categories.`;
+    mainAnalysisInstruction = `First, provide any feedback relevant to the ENTIRE paragraph for categories like "Overall Clarity & Conciseness", "Overall Argument Strength", "Overall Flow & Cohesion", "Overall Style & Tone Consistency" if they were selected.
+After addressing the overall paragraph, THEN provide focused feedback on the HIGHLIGHTED TEXT segment based on the other selected feedback categories (especially those for selections like "Grammar & Spelling (for selection)", "Word Choice (for selection)", etc.).`;
   }
 
-  const prompt = `You are Nova Pro, an expert writing tutor. A student requests feedback on a piece of their writing.
-
+  const prompt = `You are Nova Pro, an expert and meticulous writing instructor AI. A student requests feedback on their writing.
 Student's essay topic (if known): "${essayTopic || "Not specified"}"
 Type of essay (if known): "${essayType || "Not specified"}"
 ${personalizationContext}
-
-The student is looking for feedback specifically in the following areas: ${selectedFeedbackLabels}.
-
-${mainInstruction}
-${focusTextInstruction}
-
+${mainAnalysisInstruction}
+${focusInstruction}
 ---BEGIN FULL PARAGRAPH TEXT---
 ${paragraphText}
 ---END FULL PARAGRAPH TEXT---
-
-Provide constructive feedback. For each piece of feedback:
-1. Accurately state the "area" of feedback, matching one of the student's selected focus areas (e.g., "Grammar & Spelling (for selection)", "Overall Clarity & Conciseness").
-2. Explain the issue or your observation clearly and constructively.
-3. If your feedback pertains to a specific part of the text (either the highlighted selection or another part of the paragraph), quote that part accurately in the "original_text_segment" field.
-4. If appropriate, offer a concrete "suggested_revision" as an example for improvement.
-
-Structure your entire response as a single JSON array of feedback objects. Each object MUST have these keys:
-- "area": string (matching a requested feedback area)
-- "comment": string (your detailed feedback)
-- "original_text_segment": string (optional, the exact segment from student's text)
-- "suggested_revision": string (optional, a concrete suggestion)
-
-Prioritize providing distinct, actionable feedback points for each selected category. If multiple issues are found for one category, you can provide multiple feedback objects for that same 'area'.
-
-If feedback is specifically for the highlighted text, ensure 'original_text_segment' contains that highlighted text.
-
-Generate the JSON array now.`;
+Provide constructive, specific, and actionable feedback.
+For each distinct piece of feedback:
+1.  State the "area" of feedback, matching one of the student's selected focus areas (e.g., "Grammar & Spelling (for selection)", "Overall Clarity & Conciseness", "Word Choice & Vocabulary (for selection)").
+2.  Explain the issue or your observation clearly and constructively.
+3.  If your feedback pertains to a specific part of the text (either the highlighted selection OR another part of the paragraph if doing overall review), quote that part accurately in the "original_text_segment" field.
+4.  If appropriate, offer a concrete "suggested_revision" as an example for improvement.
+Structure your entire response as a single JSON array of feedback objects. Each object in the array represents one distinct piece of feedback and MUST have these keys:
+- "area": string (The feedback category. If feedback applies to the HIGHLIGHTED text, try to use a category name that implies selection focus if one was chosen by the user, e.g., "Word Choice (for selection)").
+- "comment": string (Your detailed feedback).
+- "original_text_segment": string (Optional but highly encouraged, the exact segment from student's text this feedback refers to. For HIGHLIGHTED text, this MUST be the highlighted text).
+- "suggested_revision": string (Optional, a concrete suggestion).
+Ensure your feedback is polite and tailored to a student audience. Generate several distinct feedback points covering the requested areas and the highlighted text if provided. The entire response must be ONLY the JSON array.
+`;
 
   try {
+    // console.log("Sending to Groq for essay feedback. Prompt snippet:", prompt.substring(0, 500)); // For debugging prompt
     const completion = await groq.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
-      model: "llama3-70b-8192", // Larger model for better analysis and granular feedback
-      temperature: 0.4, // Balanced temperature for focused yet nuanced feedback
-      max_tokens: 2500, // Increased tokens for more detailed granular feedback
+      model: "llama3-70b-8192",
+      temperature: 0.4,
+      max_tokens: 2000, // Allow for detailed feedback
     });
 
     const rawResponse = completion.choices[0]?.message?.content?.trim();
-    // For brevity, assuming the robust JSON parsing logic is here:
-    if (!rawResponse) throw new Error("AI returned no feedback content.");
+    if (!rawResponse)
+      return { success: false, error: "AI did not return any feedback." };
 
-    let jsonStringToParse = rawResponse;
-    const markdownJsonMatch = rawResponse.match(/```json\s*([\s\S]*?)\s*```/);
-
-    if (markdownJsonMatch && markdownJsonMatch[1]) {
-      jsonStringToParse = markdownJsonMatch[1].trim();
-    } else {
-      // Check if the response starts with an array directly
-      const arrayStartIndex = rawResponse.indexOf("[");
-      if (arrayStartIndex !== -1) {
-        jsonStringToParse = rawResponse.substring(arrayStartIndex);
-      } else {
-        // Try to find a JSON object that contains a feedback array
-        const firstBraceIndex = rawResponse.indexOf("{");
-        const lastBraceIndex = rawResponse.lastIndexOf("}");
-
-        if (firstBraceIndex === -1 || lastBraceIndex === -1) {
-          console.error(
-            "No valid JSON structure found in AI response:",
-            rawResponse
-          );
-          throw new Error(
-            "AI response does not appear to contain valid JSON structure for feedback."
-          );
-        }
-
-        jsonStringToParse = rawResponse.substring(
-          firstBraceIndex,
-          lastBraceIndex + 1
-        );
-      }
-    }
+    // Enhanced JSON parsing logic for an array of FeedbackPointForServer
+    let jsonStringToParse = "";
 
     try {
-      // Try parsing as an array first
-      let parsedFeedback;
-      if (jsonStringToParse.trim().startsWith("[")) {
-        // Direct array format
-        parsedFeedback = JSON.parse(
-          jsonStringToParse
-        ) as FeedbackPointForServer[];
-      } else {
-        // Object with feedback array property
-        const parsed = JSON.parse(jsonStringToParse);
-        if (parsed.feedback && Array.isArray(parsed.feedback)) {
-          parsedFeedback = parsed.feedback;
+      // First check if the response is wrapped in markdown code blocks
+      const markdownJsonMatch = rawResponse.match(
+        /```(?:json)?\s*([\s\S]*?)\s*```/
+      );
+      if (markdownJsonMatch && markdownJsonMatch[1]) {
+        // Extract content from code block
+        jsonStringToParse = markdownJsonMatch[1].trim();
+      } else if (
+        rawResponse.includes("Here is the feedback") ||
+        rawResponse.includes("JSON array format")
+      ) {
+        // Handle case where AI adds a preamble like "Here is the feedback in the requested JSON array format:"
+        // Find the start of the JSON array
+        const arrayStartIndex = rawResponse.indexOf("[");
+        if (arrayStartIndex !== -1) {
+          // Find the matching closing bracket
+          let depth = 0;
+          let arrayEndIndex = -1;
+
+          for (let i = arrayStartIndex; i < rawResponse.length; i++) {
+            if (rawResponse[i] === "[") depth++;
+            else if (rawResponse[i] === "]") {
+              depth--;
+              if (depth === 0) {
+                arrayEndIndex = i;
+                break;
+              }
+            }
+          }
+
+          if (arrayEndIndex > arrayStartIndex) {
+            jsonStringToParse = rawResponse.substring(
+              arrayStartIndex,
+              arrayEndIndex + 1
+            );
+          } else {
+            throw new Error(
+              "Could not find matching closing bracket for JSON array"
+            );
+          }
         } else {
-          throw new Error("JSON does not contain a valid feedback array");
+          throw new Error("Could not locate JSON array start in AI response");
         }
+      } else {
+        // Just try to parse the whole response as JSON
+        jsonStringToParse = rawResponse;
       }
+
+      // Try to parse the extracted JSON
+      const parsedFeedback = JSON.parse(
+        jsonStringToParse
+      ) as FeedbackPointForServer[];
 
       // Validate the structure
-      if (!Array.isArray(parsedFeedback) || parsedFeedback.length === 0) {
-        throw new Error("Parsed feedback is not a valid array or is empty");
+      if (!Array.isArray(parsedFeedback)) {
+        throw new Error("Parsed result is not an array");
       }
 
-      // Check each feedback item has required fields
-      if (!parsedFeedback.every((item) => item.area && item.comment)) {
-        console.error(
-          "Parsed feedback is not a valid array of FeedbackPoint objects:",
-          parsedFeedback
+      if (
+        parsedFeedback.length > 0 &&
+        !parsedFeedback.every((item) => item.area && item.comment)
+      ) {
+        throw new Error(
+          "One or more feedback items are missing required fields"
         );
-        throw new Error("AI returned feedback in an unexpected structure.");
       }
 
-      // Add IDs if they don't exist
-      const feedbackWithIds = parsedFeedback.map((item, index) => ({
-        ...item,
-        id: item.id || `fb-${Date.now()}-${index}`,
-      }));
-
-      return { success: true, feedback: feedbackWithIds };
-    } catch (error: any) {
-      console.error("Failed to parse JSON feedback from AI:", error.message);
+      return { success: true, feedback: parsedFeedback };
+    } catch (parseError: any) {
+      console.error(
+        "Failed to parse JSON feedback from AI:",
+        parseError.message
+      );
       console.error("Raw AI response for feedback:", rawResponse);
+      console.error("Attempted to parse:", jsonStringToParse);
+
+      // Try one more approach - look for array brackets and extract just that part
+      try {
+        const arrayStartIndex = rawResponse.indexOf("[");
+        const arrayEndIndex = rawResponse.lastIndexOf("]");
+
+        if (arrayStartIndex !== -1 && arrayEndIndex > arrayStartIndex) {
+          const extractedJson = rawResponse.substring(
+            arrayStartIndex,
+            arrayEndIndex + 1
+          );
+          const parsedFeedback = JSON.parse(
+            extractedJson
+          ) as FeedbackPointForServer[];
+
+          if (
+            Array.isArray(parsedFeedback) &&
+            parsedFeedback.length > 0 &&
+            parsedFeedback.every((item) => item.area && item.comment)
+          ) {
+            return { success: true, feedback: parsedFeedback };
+          }
+        }
+      } catch (fallbackError) {
+        // Fallback failed, continue to error return
+      }
+
       return {
         success: false,
-        error: `AI feedback generation failed: ${error.message}`,
+        error: `AI feedback generation failed: ${parseError.message}`,
       };
     }
   } catch (error: any) {
@@ -590,6 +629,94 @@ Generate the JSON array now.`;
     return {
       success: false,
       error: `AI feedback generation failed: ${error.message}`,
+    };
+  }
+}
+
+// --- Thesis Statement Analysis Action ---
+interface ThesisAnalysisResult {
+  success: boolean;
+  feedback?: string; // Markdown formatted feedback
+  error?: string;
+}
+
+export async function analyzeThesisAction(
+  thesisStatement: string,
+  essayTopic?: string, // Context
+  essayType?: string // Context
+): Promise<ThesisAnalysisResult> {
+  if (!groq) return { success: false, error: "AI Service not configured." };
+  if (!thesisStatement.trim())
+    return { success: false, error: "Thesis statement is required." };
+
+  // Personalization: Fetch user profile for grade level
+  let gradeContext = "for a high school student";
+  try {
+    const supabase = createSupabaseServerActionClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (!authError && user) {
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("grade_level")
+        .eq("id", user.id)
+        .single();
+
+      if (
+        profileData?.grade_level &&
+        profileData.grade_level !== "Not Specified"
+      ) {
+        gradeContext = `for a ${profileData.grade_level} student`;
+      }
+    }
+  } catch (e) {
+    /* Ignore personalization errors */
+  }
+
+  const prompt = `You are Nova Pro, an expert writing instructor. Analyze the following thesis statement ${gradeContext}.
+
+Essay Topic (if known): "${essayTopic || "Not specified"}"
+Type of Essay (if known): "${essayType || "Not specified"}"
+
+Thesis Statement to Analyze:
+"${thesisStatement}"
+
+Please provide feedback on the thesis statement, considering the following aspects:
+1. **Clarity:** Is the thesis clear and easy to understand?
+2. **Arguability/Assertiveness:** Does it make a specific claim or argument, rather than just stating a fact or topic?
+3. **Specificity & Scope:** Is it focused enough for a typical essay on this topic, or is it too broad or too narrow?
+4. **Strength:** How effective is it as a guiding statement for an essay?
+5. **(Optional) Originality/Insightfulness:** Does it offer a fresh perspective (if applicable)?
+
+Provide your feedback as a well-structured Markdown text. Use headings for each aspect you evaluate (e.g., "### Clarity", "### Arguability"). Offer specific examples or suggestions for improvement if weaknesses are identified. Keep the tone constructive and supportive.
+
+End with a "### Summary" section that provides an overall assessment and 1-2 concrete suggestions for improvement.
+`;
+
+  try {
+    const completion = await groq.chat.completions.create({
+      messages: [{ role: "user", content: prompt }],
+      model: "llama3-70b-8192", // Larger model for better analysis
+      temperature: 0.3, // Lower temperature for more focused, analytical feedback
+      max_tokens: 1500, // Allow for detailed feedback
+    });
+
+    const feedback = completion.choices[0]?.message?.content?.trim();
+    if (!feedback)
+      return {
+        success: false,
+        error: "AI did not return any feedback for the thesis.",
+      };
+
+    return { success: true, feedback };
+  } catch (error: any) {
+    console.error("Groq Thesis Analysis Error:", error);
+    return {
+      success: false,
+      error: `AI thesis analysis failed: ${error.message}`,
     };
   }
 }

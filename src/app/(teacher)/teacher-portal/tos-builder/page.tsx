@@ -56,6 +56,11 @@ import {
   getTOSTemplateByIdAction,
   deleteTOSTemplateAction,
 } from "@/app/actions/tosActions"; // New actions file
+// NEW import for lesson plan actions:
+import {
+  getSavedLessonPlansAction,
+  getLearningObjectivesForPlanAction,
+} from "@/app/actions/lessonPlanActions";
 
 // Types for TOS structure
 const BLOOM_LEVELS_DEFAULT = [
@@ -93,6 +98,18 @@ interface SavedTOSMeta {
   updated_at: string;
 }
 
+interface LessonPlanMeta {
+  // For dropdown
+  id: string;
+  title: string;
+}
+
+interface ClassifiedObjective {
+  objective_text: string;
+  suggested_cognitive_level: string;
+  reasoning?: string;
+}
+
 export default function TOSBuilderPage() {
   const router = useRouter();
   // Form states
@@ -105,8 +122,18 @@ export default function TOSBuilderPage() {
   const [totalValue, setTotalValue] = useState<number | string>(100); // Default to 100% or e.g., 50 items
   const [isPercentageBased, setIsPercentageBased] = useState(true);
 
-  const [learningObjectivesInput, setLearningObjectivesInput] = useState("");
+  const [learningObjectivesInput, setLearningObjectivesInput] = useState(""); // For manual paste
+  const [importedObjectives, setImportedObjectives] = useState<string[]>([]); // Objectives from selected lesson plan
+  const [classifiedImportedObjectives, setClassifiedImportedObjectives] =
+    useState<ClassifiedObjective[]>([]); // AI classified
   const [isClassifying, setIsClassifying] = useState(false);
+  const [availableLessonPlans, setAvailableLessonPlans] = useState<
+    LessonPlanMeta[]
+  >([]);
+  const [selectedLessonPlanId, setSelectedLessonPlanId] =
+    useState<string>("none");
+  const [isLoadingLessonPlans, setIsLoadingLessonPlans] = useState(false);
+  const [isLoadingObjectives, setIsLoadingObjectives] = useState(false);
 
   // Grid data
   const [gridData, setGridData] = useState<TOSCell[]>([]);
@@ -118,8 +145,50 @@ export default function TOSBuilderPage() {
   const [isSaving, setIsSaving] = useState(false);
   // const [savedTOS, setSavedTOS] = useState<SavedTOSMeta[]>([]);
   // const [isLoadingTOSList, setIsLoadingTOSList] = useState(true);
-  // useEffect(() => { fetchSavedTOS(); }, []);
-  // const fetchSavedTOS = async () => { /* ... */ };
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      setIsLoadingLessonPlans(true);
+      const result = await getSavedLessonPlansAction(); // This action returns id and title
+      if (result.success && result.plans) {
+        setAvailableLessonPlans(
+          result.plans.map((p) => ({ id: p.id, title: p.title }))
+        );
+      } else {
+        toast.error("Failed to load lesson plans for import.");
+      }
+      setIsLoadingLessonPlans(false);
+    };
+    fetchPlans();
+    // ... (existing useEffect for fetchSavedTOS if any)
+  }, []);
+
+  const handleLessonPlanSelect = async (planId: string) => {
+    setSelectedLessonPlanId(planId);
+    if (!planId || planId === "none") {
+      setImportedObjectives([]);
+      setClassifiedImportedObjectives([]);
+      return;
+    }
+    setIsLoadingObjectives(true);
+    setClassifiedImportedObjectives([]); // Clear previous classifications
+    try {
+      const result = await getLearningObjectivesForPlanAction(planId);
+      if (result.success && result.objectives) {
+        setImportedObjectives(result.objectives);
+        // Optionally, set learningObjectivesInput too if you want them in the textarea
+        setLearningObjectivesInput(result.objectives.join("\n"));
+      } else {
+        toast.error("Failed to load objectives", { description: result.error });
+        setImportedObjectives([]);
+      }
+    } catch (e: any) {
+      toast.error("Error loading objectives", { description: e.message });
+      setImportedObjectives([]);
+    } finally {
+      setIsLoadingObjectives(false);
+    }
+  };
 
   // Recalculate grid when contentAreas or cognitiveLevels change
   useEffect(() => {
@@ -172,22 +241,27 @@ export default function TOSBuilderPage() {
   };
 
   const handleClassifyObjectives = async () => {
-    if (!learningObjectivesInput.trim()) {
-      toast.error("Please paste some learning objectives to classify.");
+    // Use importedObjectives if available, otherwise use manually pasted text
+    const objectivesToClassify =
+      importedObjectives.length > 0
+        ? importedObjectives
+        : learningObjectivesInput.split("\n").filter((o) => o.trim() !== "");
+
+    if (objectivesToClassify.length === 0) {
+      toast.error("No learning objectives to classify.", {
+        description:
+          "Please import from a lesson plan or paste objectives manually.",
+      });
       return;
     }
     setIsClassifying(true);
     try {
-      const result = await classifyObjectivesAction(
-        learningObjectivesInput.split("\n")
-      );
+      const result = await classifyObjectivesAction(objectivesToClassify);
       if (result.success && result.classified_objectives) {
-        // This is advanced: use this data to pre-populate content areas or map objectives to cells
-        // For V1, maybe just show the classified list as a suggestion to the teacher
-        toast.success("Objectives classified (display logic TBD).");
-        console.log("Classified Objectives:", result.classified_objectives);
-        // Example: Update contentAreas based on classified objectives (if unique topics are derived)
-        // Or display them for teacher to manually add to TOS.
+        setClassifiedImportedObjectives(result.classified_objectives);
+        toast.success("Objectives classified by AI!");
+        // Teacher now needs to use this info to populate Content Areas / Cognitive Skills manually,
+        // or we could add a feature to "auto-populate TOS grid based on classification" (more advanced)
       } else {
         toast.error("Classification Failed", { description: result.error });
       }
@@ -195,6 +269,82 @@ export default function TOSBuilderPage() {
       toast.error("Classification Error", { description: e.message });
     } finally {
       setIsClassifying(false);
+    }
+  };
+
+  const handleUseSuggestedCognitiveLevels = () => {
+    if (classifiedImportedObjectives.length > 0) {
+      // Debug: Log the classified objectives to see their structure
+      console.log("Classified objectives:", classifiedImportedObjectives);
+
+      try {
+        const uniqueLevels = Array.from(
+          new Set(
+            classifiedImportedObjectives.map(
+              (obj) => obj.suggested_cognitive_level
+            )
+          )
+        );
+
+        // Debug: Log the unique levels extracted
+        console.log("Unique cognitive levels:", uniqueLevels);
+
+        // Convert to TagType format. Ensure no duplicates if cognitiveLevels state already has some.
+        const newCognitiveLevelTags: TagType[] = uniqueLevels.map((level) => ({
+          id: level,
+          text: level,
+        }));
+
+        // Debug: Log the new tags
+        console.log("New cognitive level tags:", newCognitiveLevelTags);
+
+        // Option 2: Add to existing, ensuring uniqueness (more user-friendly)
+        setCognitiveLevels((prevLevels) => {
+          const existingLevelTexts = prevLevels.map((tag) => tag.text);
+          console.log("Existing cognitive levels:", existingLevelTexts);
+
+          const levelsToAdd = newCognitiveLevelTags.filter(
+            (tag) => !existingLevelTexts.includes(tag.text)
+          );
+          console.log("Levels to add:", levelsToAdd);
+
+          const updatedLevels = [...prevLevels, ...levelsToAdd];
+          console.log("Updated cognitive levels:", updatedLevels);
+
+          // Force a re-render by updating a state variable
+          setTimeout(() => {
+            // This will trigger a re-render after the state update has been processed
+            setTosTitle((prev) => {
+              console.log("Forcing re-render");
+              return prev;
+            });
+          }, 100);
+
+          return updatedLevels;
+        });
+
+        // Also remind the user to add content areas if they haven't already
+        if (contentAreas.length === 0) {
+          toast.info("Don't forget to add Content Areas to see the TOS grid!", {
+            description:
+              "The grid will appear once you have both Cognitive Levels and Content Areas.",
+            duration: 5000,
+          });
+        }
+
+        toast.success(
+          "Suggested cognitive levels added to your TOS structure!"
+        );
+      } catch (error) {
+        console.error("Error processing cognitive levels:", error);
+        toast.error(
+          "Failed to process cognitive levels. Check console for details."
+        );
+      }
+    } else {
+      toast.error(
+        "No classified objectives available to extract cognitive levels from."
+      );
     }
   };
 
@@ -361,39 +511,147 @@ export default function TOSBuilderPage() {
         </CardContent>
       </Card>
 
-      {/* AI Assistance for Objectives (Optional V1 Feature) */}
+      {/* Section for Importing/Classifying Learning Objectives */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
-            <Palette className="mr-2 h-5 w-5 text-purple-500" /> AI Assist:
-            Classify Learning Objectives (Optional)
+            <ListChecks className="mr-2 h-5 w-5 text-blue-500" /> Learning
+            Objectives Helper
           </CardTitle>
           <CardDescription>
-            Paste your learning objectives (one per line). Nova Pro can help
-            classify them by cognitive level to inform your TOS.
+            Import learning objectives from a saved lesson plan or paste them
+            manually. Then, let Nova Pro help classify them by cognitive level
+            to inform your TOS.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Textarea
-            value={learningObjectivesInput}
-            onChange={(e) => setLearningObjectivesInput(e.target.value)}
-            placeholder="Paste learning objectives here, one per line..."
-            className="min-h-[100px]"
-          />
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="lessonPlanSelect">
+              Import Objectives from Lesson Plan (Optional)
+            </Label>
+            <Select
+              value={selectedLessonPlanId}
+              onValueChange={handleLessonPlanSelect}
+              disabled={isLoadingLessonPlans || isLoadingObjectives}
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select a lesson plan..." />
+              </SelectTrigger>
+              <SelectContent>
+                {isLoadingLessonPlans ? (
+                  <SelectItem value="loading" disabled>
+                    Loading plans...
+                  </SelectItem>
+                ) : null}
+                <SelectItem value="none">
+                  -- Do Not Import / Clear --
+                </SelectItem>
+                {availableLessonPlans.map((plan) => (
+                  <SelectItem key={plan.id} value={plan.id}>
+                    {plan.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {isLoadingObjectives && <Loader2 className="h-5 w-5 animate-spin" />}
+          {importedObjectives.length > 0 && !isLoadingObjectives && (
+            <div className="p-3 border rounded-md bg-muted/30">
+              <h4 className="text-sm font-semibold mb-1">
+                Imported Objectives from "
+                {
+                  availableLessonPlans.find(
+                    (p) => p.id === selectedLessonPlanId
+                  )?.title
+                }
+                ":
+              </h4>
+              <ul className="list-disc list-inside text-sm space-y-1">
+                {importedObjectives.map((obj, i) => (
+                  <li key={i}>{obj}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div>
+            <Label htmlFor="learningObjectivesInput">
+              Or Paste Learning Objectives Manually (one per line)
+            </Label>
+            <Textarea
+              id="learningObjectivesInput"
+              value={learningObjectivesInput}
+              onChange={(e) => {
+                setLearningObjectivesInput(e.target.value);
+                if (selectedLessonPlanId && selectedLessonPlanId !== "none")
+                  setSelectedLessonPlanId("none"); // Clear import if manually typing
+                if (importedObjectives.length > 0) setImportedObjectives([]);
+                if (classifiedImportedObjectives.length > 0)
+                  setClassifiedImportedObjectives([]);
+              }}
+              placeholder="e.g., Students will be able to define osmosis.
+Students will be able to apply the Pythagorean theorem..."
+              className="min-h-[100px] mt-1"
+              disabled={isClassifying}
+            />
+          </div>
           <Button
             onClick={handleClassifyObjectives}
             variant="outline"
             className="mt-2"
-            disabled={isClassifying || !learningObjectivesInput.trim()}
+            disabled={
+              isClassifying ||
+              (!learningObjectivesInput.trim() &&
+                importedObjectives.length === 0)
+            }
           >
             {isClassifying ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <Wand2 className="mr-2 h-4 w-4" />
-            )}{" "}
-            Classify Objectives
+            )}
+            AI Classify Objectives by Cognitive Level
           </Button>
-          {/* Display classified objectives (if any) here */}
+          {classifiedImportedObjectives.length > 0 && !isClassifying && (
+            <div className="mt-4 p-3 border rounded-md bg-green-50 dark:bg-green-900/20">
+              <h4 className="text-sm font-semibold mb-2 text-green-700 dark:text-green-300">
+                AI Suggested Classifications:
+              </h4>
+              <ul className="space-y-2 text-sm">
+                {classifiedImportedObjectives.map((cObj, i) => (
+                  <li key={i} className="border-b pb-1 last:border-b-0">
+                    <strong>Objective:</strong> {cObj.objective_text} <br />
+                    <span className="ml-2">
+                      ↳{" "}
+                      <strong className="text-green-600 dark:text-green-400">
+                        Suggested Level:
+                      </strong>{" "}
+                      {cObj.suggested_cognitive_level}
+                    </span>
+                    {cObj.reasoning && (
+                      <span className="ml-2 text-xs text-muted-foreground italic">
+                        ({cObj.reasoning})
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {/* === NEW BUTTON === */}
+              <Button
+                onClick={handleUseSuggestedCognitiveLevels}
+                variant="outline"
+                size="sm"
+                className="mt-3 bg-green-100 hover:bg-green-200 dark:bg-green-800/50 dark:hover:bg-green-700/50 border-green-300 dark:border-green-600 text-green-700 dark:text-green-300"
+              >
+                Use These Suggested Levels in My TOS Columns
+              </Button>
+              {/* === END NEW BUTTON === */}
+              <p className="text-xs text-muted-foreground mt-3">
+                Use these suggestions to help you fill out the Cognitive Skill
+                Levels and Content Areas in your TOS grid above/below.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 

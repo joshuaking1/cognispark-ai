@@ -57,6 +57,44 @@ if (!groqApiKey)
   console.error("CRITICAL: GROQ_API_KEY for Lesson Plan actions is not set.");
 const groq = groqApiKey ? new Groq({ apiKey: groqApiKey }) : null;
 
+// Helper function to verify user is authenticated
+async function verifyUser() {
+  try {
+    const supabase = createSupabaseServerActionClient();
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+    if (error) return { user: null, error: "Authentication failed" };
+    return { user, error: null };
+  } catch (e) {
+    return { user: null, error: "Authentication check failed" };
+  }
+}
+
+// Helper function to verify teacher role
+async function verifyTeacher() {
+  try {
+    const { user, error } = await verifyUser();
+    if (error || !user) return { user: null, error: "Authentication failed" };
+
+    const supabase = createSupabaseServerActionClient();
+    const { data, error: roleError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (roleError) return { user: null, error: "Role verification failed" };
+    if (data?.role !== "teacher")
+      return { user: null, error: "Teacher role required" };
+
+    return { user, error: null };
+  } catch (e) {
+    return { user: null, error: "Teacher verification failed" };
+  }
+}
+
 export async function generateLessonPlanAction(
   payload: GeneratePlanPayload
 ): Promise<GeneratePlanResult> {
@@ -470,19 +508,16 @@ export async function getSavedLessonPlansAction(): Promise<{
   plans?: SavedLessonPlanMetaForClient[];
   error?: string;
 }> {
-  const supabase = createSupabaseServerActionClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  if (authError || !user)
-    return { success: false, error: "User not authenticated." };
+  const authCheck = await verifyTeacher();
+  if (authCheck.error || !authCheck.user)
+    return { success: false, error: authCheck.error };
 
+  const supabase = createSupabaseServerActionClient();
   try {
     const { data, error } = await supabase
       .from("lesson_plans")
       .select("id, title, subject, form_grade_level, updated_at")
-      .eq("teacher_id", user.id)
+      .eq("teacher_id", authCheck.user.id)
       .order("updated_at", { ascending: false });
 
     if (error) throw error;
@@ -499,21 +534,18 @@ export async function getLessonPlanByIdAction(planId: string): Promise<{
   plan?: GeneratedLessonPlanForDB; // Returns the full plan structure
   error?: string;
 }> {
-  const supabase = createSupabaseServerActionClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  if (authError || !user)
-    return { success: false, error: "User not authenticated." };
+  const authCheck = await verifyTeacher();
+  if (authCheck.error || !authCheck.user)
+    return { success: false, error: authCheck.error };
   if (!planId) return { success: false, error: "Plan ID is required." };
 
+  const supabase = createSupabaseServerActionClient();
   try {
     const { data, error } = await supabase
       .from("lesson_plans")
       .select("*") // Select all fields for editing
       .eq("id", planId)
-      .eq("teacher_id", user.id) // Ensure teacher owns it
+      .eq("teacher_id", authCheck.user.id) // Ensure teacher owns it
       .single();
 
     if (error) throw error;
@@ -529,26 +561,62 @@ export async function getLessonPlanByIdAction(planId: string): Promise<{
   }
 }
 
+// --- Get Learning Objectives for a Lesson Plan ---
+export async function getLearningObjectivesForPlanAction(
+  planId: string
+): Promise<{
+  success: boolean;
+  objectives?: string[];
+  error?: string;
+}> {
+  const authCheck = await verifyTeacher();
+  if (authCheck.error || !authCheck.user)
+    return { success: false, error: authCheck.error };
+  if (!planId) return { success: false, error: "Plan ID is required." };
+
+  const supabase = createSupabaseServerActionClient();
+  try {
+    const { data, error } = await supabase
+      .from("lesson_plans")
+      .select("learning_outcomes") // Only select the learning_outcomes field
+      .eq("id", planId)
+      .eq("teacher_id", authCheck.user.id) // Ensure teacher owns it
+      .single();
+
+    if (error) throw error;
+    if (!data)
+      return {
+        success: false,
+        error: "Lesson plan not found or no objectives.",
+      };
+
+    // learning_outcomes is stored as jsonb array of strings
+    const objectives = (data.learning_outcomes as string[]) || [];
+    return { success: true, objectives };
+  } catch (e: any) {
+    console.error(`Error fetching objectives for lesson plan ${planId}:`, e);
+    return { success: false, error: e.message };
+  }
+}
+
 // --- Delete Lesson Plan ---
 export async function deleteLessonPlanAction(planId: string): Promise<{
   success: boolean;
   error?: string;
 }> {
-  const supabase = createSupabaseServerActionClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-  if (authError || !user)
-    return { success: false, error: "User not authenticated." };
+  const authCheck = await verifyTeacher();
+  if (authCheck.error || !authCheck.user)
+    return { success: false, error: authCheck.error };
   if (!planId) return { success: false, error: "Plan ID is required." };
+
+  const supabase = createSupabaseServerActionClient();
 
   try {
     const { error } = await supabase
       .from("lesson_plans")
       .delete()
       .eq("id", planId)
-      .eq("teacher_id", user.id); // Ensure teacher owns it
+      .eq("teacher_id", authCheck.user.id); // Ensure teacher owns it
 
     if (error) throw error;
     revalidatePath("/teacher-portal/lesson-planner");

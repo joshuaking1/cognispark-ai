@@ -39,10 +39,12 @@ import {
   brainstormEssayIdeasAction,
   generateEssayOutlineAction,
   getParagraphFeedbackAction,
+  analyzeThesisAction,
 } from "@/app/actions/essayActions";
 
 // Custom hooks
 import { useFeatureTour } from "@/hooks/useFeatureTour";
+import ChatMessageContentRenderer from "@/components/chat/ChatMessageContentRenderer";
 
 interface BrainstormPoint {
   id: string;
@@ -144,6 +146,11 @@ export default function EssayHelperPage() {
   const [feedbackResults, setFeedbackResults] = useState<FeedbackPoint[]>([]);
   const [isGettingFeedback, setIsGettingFeedback] = useState(false);
 
+  // Thesis analyzer state
+  const [thesisStatement, setThesisStatement] = useState("");
+  const [thesisFeedback, setThesisFeedback] = useState<string | null>(null);
+  const [isAnalyzingThesis, setIsAnalyzingThesis] = useState(false);
+
   const tourSteps: Step[] = [
     {
       target: ".essay-helper-tabs",
@@ -162,6 +169,12 @@ export default function EssayHelperPage() {
       target: ".brainstorm-actions-section", // Updated target for buttons
       content:
         "Then, brainstorm ideas or generate a structured outline for your essay.",
+      placement: "bottom",
+    },
+    {
+      target: '[data-value="thesis-analyzer"]',
+      content:
+        "Use the Thesis Analyzer to get feedback on your thesis statement's clarity, arguability, and strength.",
       placement: "bottom",
     },
     {
@@ -296,6 +309,35 @@ export default function EssayHelperPage() {
     });
   };
 
+  const handleAnalyzeThesis = async () => {
+    if (!thesisStatement.trim()) {
+      toast.error("Please enter a thesis statement to analyze.");
+      return;
+    }
+
+    setIsAnalyzingThesis(true);
+    setThesisFeedback(null);
+
+    try {
+      const result = await analyzeThesisAction(
+        thesisStatement,
+        essayTopic,
+        essayType
+      );
+
+      if (result.success && result.feedback) {
+        setThesisFeedback(result.feedback);
+        toast.success("Thesis analysis complete!");
+      } else {
+        toast.error("Thesis Analysis Failed", { description: result.error });
+      }
+    } catch (error: any) {
+      toast.error("Analysis Error", { description: error.message });
+    } finally {
+      setIsAnalyzingThesis(false);
+    }
+  };
+
   const handleAcceptSuggestion = (feedbackPoint: FeedbackPoint) => {
     if (
       !feedbackPoint.suggested_revision ||
@@ -353,7 +395,21 @@ export default function EssayHelperPage() {
       return;
     }
 
-    const currentSnippet = userSelectedSnippet; // Use the state variable
+    // Get the current selection directly from the textarea
+    let currentSnippet = "";
+    if (paragraphTextareaRef.current) {
+      const textarea = paragraphTextareaRef.current;
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      if (start !== end) {
+        currentSnippet = textarea.value.substring(start, end);
+        setUserSelectedSnippet(currentSnippet);
+      } else {
+        currentSnippet = userSelectedSnippet; // Fallback to stored selection if no active selection
+      }
+    } else {
+      currentSnippet = userSelectedSnippet; // Fallback if ref not available
+    }
 
     // Set displayed snippet for feedback confirmation
     if (currentSnippet) {
@@ -382,17 +438,15 @@ export default function EssayHelperPage() {
           suggested_revision: fb.suggested_revision,
           applies_to_selection: !!(
             currentSnippet &&
-            // Check if feedback area is selection-focused
-            (fb.area.toLowerCase().includes("(for selection)") ||
-              // Or if the original text segment matches the selected snippet
-              (fb.original_text_segment &&
-                (currentSnippet.includes(fb.original_text_segment) ||
-                  fb.original_text_segment.includes(currentSnippet) ||
-                  // More flexible matching for partial overlaps
-                  fb.original_text_segment.trim() === currentSnippet.trim())) ||
-              // Or if comment mentions selection/highlighted text
+            // Check if the original text segment is part of the selected snippet
+            ((fb.original_text_segment &&
+              currentSnippet
+                .toLowerCase()
+                .includes(fb.original_text_segment.toLowerCase())) ||
+              // Or if comment mentions selection/highlighted/selected text
               fb.comment.toLowerCase().includes("your selection") ||
-              fb.comment.toLowerCase().includes("highlighted text"))
+              fb.comment.toLowerCase().includes("highlighted text") ||
+              fb.comment.toLowerCase().includes("selected text"))
           ),
         }));
         setFeedbackResults(structuredFeedback);
@@ -459,13 +513,20 @@ export default function EssayHelperPage() {
             defaultValue="brainstorm-outline"
             className="w-full essay-helper-tabs"
           >
-            <TabsList className="grid w-full grid-cols-2 h-auto rounded-none bg-slate-100 dark:bg-slate-800 p-1">
+            <TabsList className="grid w-full grid-cols-3 h-auto rounded-none bg-slate-100 dark:bg-slate-800 p-1">
               <TabsTrigger
                 value="brainstorm-outline"
                 className="text-sm md:text-base py-3 data-[state=active]:bg-[#fd6a3e] data-[state=active]:text-white data-[state=active]:shadow-lg rounded-md transition-all duration-200 ease-in-out text-slate-700 dark:text-slate-300 hover:bg-orange-100 dark:hover:bg-orange-800/30"
               >
                 <Wand2 className="mr-2 h-4 w-4 md:h-5 md:w-5" /> Brainstorm &
                 Outline
+              </TabsTrigger>
+              <TabsTrigger
+                value="thesis-analyzer"
+                className="text-sm md:text-base py-3 data-[state=active]:bg-[#2563eb] data-[state=active]:text-white data-[state=active]:shadow-lg rounded-md transition-all duration-200 ease-in-out text-slate-700 dark:text-slate-300 hover:bg-blue-100 dark:hover:bg-blue-800/30"
+              >
+                <Sparkles className="mr-2 h-4 w-4 md:h-5 md:w-5" /> Thesis
+                Analyzer
               </TabsTrigger>
               <TabsTrigger
                 value="paragraph-feedback"
@@ -655,6 +716,100 @@ export default function EssayHelperPage() {
             </TabsContent>
 
             <TabsContent
+              value="thesis-analyzer"
+              className="p-5 md:p-7 space-y-8 bg-white dark:bg-slate-900"
+            >
+              <section className="space-y-6 p-5 md:p-6 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700/70 shadow-sm">
+                <h3
+                  className="text-lg font-semibold flex items-center"
+                  style={{ color: BRAND_BLUE }}
+                >
+                  <Sparkles
+                    className="mr-2 h-5 w-5"
+                    style={{ color: "#2563eb" }}
+                  />
+                  <span className="dark:text-blue-300">
+                    Thesis Statement Analyzer
+                  </span>
+                </h3>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Enter your thesis statement below to get detailed feedback on
+                  its clarity, arguability, specificity, and overall strength.
+                </p>
+
+                <div className="space-y-4">
+                  <div>
+                    <Label
+                      htmlFor="thesisStatement"
+                      className="text-base font-medium text-slate-700 dark:text-slate-300"
+                    >
+                      Your Thesis Statement{" "}
+                      <span className="text-red-500">*</span>
+                    </Label>
+                    <Textarea
+                      id="thesisStatement"
+                      value={thesisStatement}
+                      onChange={(e) => setThesisStatement(e.target.value)}
+                      placeholder="e.g., The rapid advancement of AI presents both unprecedented opportunities and significant ethical challenges for society."
+                      className="mt-2 min-h-[100px] text-base border-slate-300 dark:border-slate-600 focus:border-[#2563eb] focus:ring-1 focus:ring-[#2563eb] dark:bg-slate-700/40 dark:focus:border-[#2563eb]"
+                      disabled={isAnalyzingThesis}
+                    />
+                  </div>
+
+                  <Button
+                    onClick={handleAnalyzeThesis}
+                    disabled={isAnalyzingThesis || !thesisStatement.trim()}
+                    style={{ backgroundColor: "#2563eb" }}
+                    className="w-full sm:w-auto h-11 text-sm md:text-base text-white shadow-md hover:shadow-lg hover:opacity-90 transition-all duration-200 rounded-lg disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {isAnalyzingThesis ? (
+                      <Loader2 className="mr-2 h-4 w-4 md:h-5 md:w-5 animate-spin" />
+                    ) : (
+                      <Sparkles className="mr-2 h-4 w-4 md:h-5 md:w-5" />
+                    )}
+                    Analyze Thesis
+                  </Button>
+                </div>
+              </section>
+
+              {isAnalyzingThesis && (
+                <div className="flex flex-col items-center justify-center text-center p-8 space-y-3">
+                  <Loader2
+                    className="h-8 w-8 animate-spin text-[#2563eb]"
+                    strokeWidth={2}
+                  />
+                  <p className="text-slate-600 dark:text-slate-400 text-sm">
+                    Nova is analyzing your thesis statement...
+                    <br />
+                    This might take a few moments.
+                  </p>
+                </div>
+              )}
+
+              {!isAnalyzingThesis && thesisFeedback && (
+                <section className="pt-6">
+                  <Separator className="my-4" />
+                  <h3
+                    className="text-xl md:text-2xl font-semibold flex items-center mb-4"
+                    style={{ color: BRAND_BLUE }}
+                  >
+                    <CheckCircle2 className="mr-3 h-6 w-6 text-green-500" />
+                    <span className="dark:text-blue-300">
+                      Nova's Thesis Feedback
+                    </span>
+                  </h3>
+                  <Card className="rounded-xl shadow-md transition-all hover:shadow-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/70">
+                    <CardContent className="p-5 md:p-6">
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <ChatMessageContentRenderer content={thesisFeedback} />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </section>
+              )}
+            </TabsContent>
+
+            <TabsContent
               value="paragraph-feedback"
               className="p-5 md:p-7 space-y-8 bg-white dark:bg-slate-900 paragraph-section"
             >
@@ -676,7 +831,9 @@ export default function EssayHelperPage() {
                     htmlFor="paragraphText"
                     className="text-sm font-medium text-slate-700 dark:text-slate-300"
                   >
-                    Paste Your Paragraph Here
+                    Paste your paragraph below. To get focused feedback on a
+                    specific part, simply <strong>highlight that text</strong>{" "}
+                    before clicking 'Get Feedback'.
                   </Label>
                   <Textarea
                     id="paragraphText"
