@@ -15,7 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, UserPlus, Sparkles, Brain, Zap } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -83,117 +83,105 @@ export default function SignUpPage() {
   };
 
   return (
-    <div className="relative min-h-screen flex-col items-center justify-center grid lg:max-w-none lg:grid-cols-2">
-      {/* Left Side - Brand Showcase */}
-      <div className="relative hidden h-full flex-col p-10 text-white lg:flex dark:border-r overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-[#022e7d] via-[#1e40af] to-[#fd6a3e]" />
+    <div className="container relative h-screen flex-col items-center justify-center grid lg:max-w-none lg:grid-cols-2 lg:px-0">
+      <div className="relative hidden h-full flex-col p-10 text-white lg:flex dark:border-r">
+        {/* Background Image Layer (Bottom) */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `url(/PIC.jpg)`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            zIndex: 0,
+          }}
+        />
 
-        {/* Decorative Elements */}
-        <div className="absolute top-20 right-20 w-32 h-32 bg-white/10 rounded-full blur-xl"></div>
-        <div className="absolute bottom-40 left-10 w-24 h-24 bg-[#fd6a3e]/30 rounded-full blur-lg"></div>
-        <div className="absolute top-1/2 right-10 w-16 h-16 bg-white/20 rounded-full blur-md"></div>
+        {/* Semi-transparent Blue Gradient Layer (Middle) */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `linear-gradient(135deg, rgba(2, 46, 125, 0.9) 0%, rgba(30, 64, 175, 0.85) 70%, rgba(37, 99, 235, 0.8) 100%)`,
+            zIndex: 1,
+          }}
+        />
 
-        {/* Logo and Brand */}
-        <div className="relative z-20 flex items-center text-xl font-bold">
-          <div className="mr-3 p-2 bg-white rounded-xl shadow-lg">
+        <div className="relative z-20 flex items-center text-lg font-medium">
+          <div className="mr-3 p-2 rounded-lg">
             <img
-              src="/LearnBridge logo inverted2.png"
-              alt="LearnBrigeEdu Logo"
-              className="h-8 w-auto"
+              src="/LearnBridge logo inverted croped.png"
+              alt="LearnBridge Logo"
+              className="h-14 w-auto"
             />
           </div>
         </div>
 
-        {/* Features */}
-        <div className="relative z-20 mt-16 space-y-8">
-          <div className="space-y-6">
-            <h2 className="text-3xl font-bold leading-tight">
-              Transform Your Learning with AI-Powered Flashcards
-            </h2>
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <div className="p-2 bg-[#fd6a3e]/20 rounded-lg">
-                  <Sparkles className="h-8 w-8 mr-2 text-[#fd6a3e]" />
-                </div>
-                <span className="text-lg">AI-Generated Content</span>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="p-2 bg-[#fd6a3e]/20 rounded-lg">
-                  <Brain className="h-5 w-5 text-[#fd6a3e]" />
-                </div>
-                <span className="text-lg">Smart Learning Algorithms</span>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="p-2 bg-[#fd6a3e]/20 rounded-lg">
-                  <Zap className="h-5 w-5 text-[#fd6a3e]" />
-                </div>
-                <span className="text-base">Instant Knowledge Retention</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Testimonial */}
         <div className="relative z-20 mt-auto">
-          <div className="p-4 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20">
+          <div className="p-6 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20">
             <blockquote className="space-y-4">
               <p className="text-base leading-relaxed">
-                &ldquo;LearnBrigeEdu revolutionized my study routine. The
-                AI-powered flashcards adapt to my learning pace, making complex
-                topics easier to master. I've improved my retention by
-                300%!&rdquo;
+                &ldquo;For the first time in history, an AI specifically trained
+                on the Standards-Based Curriculum (SBC) is available to us. This
+                novel tool is a timely, vital intervention that redefines lesson
+                planning and execution, setting a new standard for academic
+                excellence.​&rdquo;
               </p>
-              <footer className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-[#fd6a3e] to-[#f97316] rounded-full flex items-center justify-center">
-                  <span className="text-sm font-bold text-white">PA</span>
-                </div>
-                <div>
-                  <div className="font-semibold">Princess Abbey</div>
-                  <div className="text-sm text-blue-200">Student, Ghana</div>
-                </div>
+              <footer className="text-xs opacity-90 font-medium">
+                Diana Akosua Mintah - Head Mistress
+                <br />
+                Ghana Senior High School
               </footer>
             </blockquote>
           </div>
         </div>
       </div>
 
-      {/* Right Side - Signup Form */}
-      <div className="relative lg:p-8 flex items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-orange-50">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-40">
-          <div className="absolute top-20 left-20 w-72 h-72 bg-[#fd6a3e]/10 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-20 right-20 w-96 h-96 bg-[#022e7d]/10 rounded-full blur-3xl"></div>
-        </div>
+      <div
+        className="relative lg:p-8 flex items-center justify-center min-h-screen"
+        style={{
+          background: `linear-gradient(135deg, #fef7f0 0%, #f0f4ff 50%, #fef7f0 100%)`,
+        }}
+      >
+        <div
+          className="absolute inset-0 opacity-30"
+          style={{
+            backgroundImage: `radial-gradient(circle at 20% 50%, rgba(253, 106, 62, 0.1) 0%, transparent 50%), 
+                           radial-gradient(circle at 80% 20%, rgba(2, 46, 125, 0.1) 0%, transparent 50%),
+                           radial-gradient(circle at 40% 80%, rgba(253, 106, 62, 0.05) 0%, transparent 50%)`,
+          }}
+        />
 
-        <Card className="relative w-full max-w-md mx-4 shadow-2xl border-0 bg-white/95 backdrop-blur-sm overflow-hidden">
-          {/* Card Glow Effect */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[#fd6a3e]/5 to-[#022e7d]/5 rounded-2xl" />
+        <Card className="relative w-full max-w-md mx-4 shadow-2xl border-0 bg-white/95 backdrop-blur-sm">
+          <div
+            className="absolute inset-0 rounded-lg"
+            style={{
+              background: `linear-gradient(135deg, rgba(2, 46, 125, 0.05) 0%, rgba(253, 106, 62, 0.05) 100%)`,
+            }}
+          />
 
-          <CardHeader className="relative space-y-6 pb-8">
-            {/* Icon */}
+          <CardHeader className="relative space-y-4 pb-8">
             <div className="flex justify-center mb-2">
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-[#fd6a3e] to-[#f97316] shadow-lg">
-                <UserPlus className="h-8 w-8 text-white" />
+              <div className="p-4 rounded-full shadow-lg bg-white">
+                <img
+                  src="/LearnBridge icon white.png"
+                  alt="LearnBridge Logo"
+                  className="h-12 w-auto"
+                />
               </div>
             </div>
-
-            {/* Title */}
-            <div className="text-center space-y-3">
-              <CardTitle className="text-3xl font-bold bg-gradient-to-r from-[#022e7d] to-[#1e40af] bg-clip-text text-transparent">
-                Join LearnBrigeEdu
-              </CardTitle>
-              <CardDescription className="text-gray-600 text-base leading-relaxed">
-                Create your account and unlock the power of AI-driven learning
-              </CardDescription>
-            </div>
+            <CardTitle
+              className="text-3xl font-bold text-center"
+              style={{ color: "#fd6a3e" }}
+            >
+              Create an account
+            </CardTitle>
+            <CardDescription className="text-center text-slate-600 text-base">
+              Join LearnBridgeEdu and start your learning journey
+            </CardDescription>
           </CardHeader>
 
           <CardContent className="relative space-y-6">
             {error && (
-              <Alert
-                variant="destructive"
-                className="border-red-200 bg-red-50/80 backdrop-blur-sm"
-              >
+              <Alert className="border-red-200 bg-red-50">
                 <AlertDescription className="text-red-700">
                   {error}
                 </AlertDescription>
@@ -201,39 +189,55 @@ export default function SignUpPage() {
             )}
 
             <form onSubmit={handleSignUp} className="space-y-6">
-              <div className="space-y-5">
-                {/* Full Name Field */}
+              <div className="space-y-4">
                 <div className="space-y-2">
                   <Label
                     htmlFor="fullName"
-                    className="text-sm font-semibold text-[#022e7d]"
+                    className="text-sm font-medium text-slate-700"
                   >
                     Full Name
                   </Label>
-                  <div className="relative group">
+                  <div className="relative">
                     <Input
                       id="fullName"
+                      placeholder="Your full name"
                       type="text"
-                      placeholder="Enter your full name"
+                      autoCapitalize="none"
                       autoComplete="name"
+                      autoCorrect="off"
                       disabled={loading}
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       required
-                      className="h-12 pl-4 text-base bg-white/80 border-2 border-gray-200 focus:bg-white focus:border-[#fd6a3e] focus:ring-4 focus:ring-[#fd6a3e]/20 transition-all duration-300 rounded-xl group-hover:border-[#fd6a3e]/50"
+                      className="h-12 pl-4 text-base bg-slate-50 border-slate-200 focus:bg-white transition-all duration-200"
+                      style={{
+                        borderColor: "#e2e8f0",
+                        "&:focus": {
+                          borderColor: "#fd6a3e",
+                          boxShadow: `0 0 0 3px rgba(253, 106, 62, 0.1)`,
+                        },
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = "#fd6a3e";
+                        e.target.style.boxShadow =
+                          "0 0 0 3px rgba(253, 106, 62, 0.1)";
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = "#e2e8f0";
+                        e.target.style.boxShadow = "none";
+                      }}
                     />
                   </div>
                 </div>
 
-                {/* Email Field */}
                 <div className="space-y-2">
                   <Label
                     htmlFor="email"
-                    className="text-sm font-semibold text-[#022e7d]"
+                    className="text-sm font-medium text-slate-700"
                   >
                     Email Address
                   </Label>
-                  <div className="relative group">
+                  <div className="relative">
                     <Input
                       id="email"
                       placeholder="name@example.com"
@@ -245,97 +249,133 @@ export default function SignUpPage() {
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
-                      className="h-12 pl-4 text-base bg-white/80 border-2 border-gray-200 focus:bg-white focus:border-[#fd6a3e] focus:ring-4 focus:ring-[#fd6a3e]/20 transition-all duration-300 rounded-xl group-hover:border-[#fd6a3e]/50"
+                      className="h-12 pl-4 text-base bg-slate-50 border-slate-200 focus:bg-white transition-all duration-200"
+                      style={{
+                        borderColor: "#e2e8f0",
+                        "&:focus": {
+                          borderColor: "#fd6a3e",
+                          boxShadow: `0 0 0 3px rgba(253, 106, 62, 0.1)`,
+                        },
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = "#fd6a3e";
+                        e.target.style.boxShadow =
+                          "0 0 0 3px rgba(253, 106, 62, 0.1)";
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = "#e2e8f0";
+                        e.target.style.boxShadow = "none";
+                      }}
                     />
                   </div>
                 </div>
 
-                {/* Password Field */}
                 <div className="space-y-2">
                   <Label
                     htmlFor="password"
-                    className="text-sm font-semibold text-[#022e7d]"
+                    className="text-sm font-medium text-slate-700"
                   >
                     Password
                   </Label>
-                  <div className="relative group">
+                  <div className="relative">
                     <Input
                       id="password"
                       type="password"
-                      placeholder="Create a strong password"
+                      placeholder="••••••••"
                       autoComplete="new-password"
                       disabled={loading}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
                       minLength={6}
-                      className="h-12 pl-4 text-base bg-white/80 border-2 border-gray-200 focus:bg-white focus:border-[#fd6a3e] focus:ring-4 focus:ring-[#fd6a3e]/20 transition-all duration-300 rounded-xl group-hover:border-[#fd6a3e]/50"
+                      className="h-12 pl-4 text-base bg-slate-50 border-slate-200 focus:bg-white transition-all duration-200"
+                      onFocus={(e) => {
+                        e.target.style.borderColor = "#fd6a3e";
+                        e.target.style.boxShadow =
+                          "0 0 0 3px rgba(253, 106, 62, 0.1)";
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = "#e2e8f0";
+                        e.target.style.boxShadow = "none";
+                      }}
                     />
                   </div>
-                  <p className="text-xs text-gray-500 pl-1">
+                  <p className="text-xs text-slate-500 pl-1">
                     Password must be at least 6 characters long
                   </p>
                 </div>
 
-                {/* Role Selection Field */}
                 <div className="space-y-2">
                   <Label
                     htmlFor="roleSelect"
-                    className="text-sm font-semibold text-[#022e7d]"
+                    className="text-sm font-medium text-slate-700"
                   >
                     I am a:
                   </Label>
-                  <div className="relative group">
-                    <Select
-                      value={selectedRole}
-                      onValueChange={(value: "student" | "teacher") =>
-                        setSelectedRole(value)
-                      }
-                      required
+                  <Select
+                    value={selectedRole}
+                    onValueChange={(value: "student" | "teacher") =>
+                      setSelectedRole(value)
+                    }
+                    required
+                  >
+                    <SelectTrigger
+                      id="roleSelect"
+                      className="h-12 pl-4 text-base bg-slate-50 border-slate-200 focus:bg-white transition-all duration-200"
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = "#fd6a3e";
+                        e.currentTarget.style.boxShadow =
+                          "0 0 0 3px rgba(253, 106, 62, 0.1)";
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = "#e2e8f0";
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
                     >
-                      <SelectTrigger
-                        id="roleSelect"
-                        className="w-full h-12 text-base bg-white/80 border-2 border-gray-200 focus:bg-white focus:border-[#fd6a3e] focus:ring-4 focus:ring-[#fd6a3e]/20 transition-all duration-300 rounded-xl group-hover:border-[#fd6a3e]/50"
-                      >
-                        <SelectValue placeholder="Select your role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="student">Student</SelectItem>
-                        <SelectItem value="teacher">Teacher</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      <SelectValue placeholder="Select your role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="student">Student</SelectItem>
+                      <SelectItem value="teacher">Teacher</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
-              {/* Submit Button */}
               <Button
                 disabled={loading}
                 type="submit"
-                className="w-full h-12 text-base font-bold bg-gradient-to-r from-[#fd6a3e] to-[#f97316] hover:from-[#f97316] hover:to-[#fd6a3e] border-0 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:scale-[1.02] rounded-xl"
+                className="w-full h-12 text-base font-semibold text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-[1.02] hover:shadow-2xl bg-[#022e7d] hover:bg-[#011f5a]"
+                style={{ boxShadow: `0 10px 25px rgba(2, 46, 125, 0.3)` }}
               >
                 {loading ? (
                   <>
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Creating Your Account...
+                    Creating account...
                   </>
                 ) : (
-                  <>
-                    <Sparkles className="mr-2 h-5 w-5" />
-                    Create Your Account
-                  </>
+                  "Create Your Account"
                 )}
               </Button>
             </form>
           </CardContent>
 
-          <CardFooter className="relative pt-6 pb-8">
+          <CardFooter className="relative pt-6">
             <div className="w-full text-center">
-              <p className="text-gray-600">
+              <p className="text-slate-600">
                 Already have an account?{" "}
                 <Link
                   href="/login"
-                  className="font-bold text-[#fd6a3e] hover:text-[#f97316] transition-colors duration-200 hover:underline"
+                  className="font-semibold transition-colors duration-200 hover:underline"
+                  style={{
+                    color: "#fd6a3e",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = "#022e7d";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = "#fd6a3e";
+                  }}
                 >
                   Sign in here
                 </Link>
@@ -343,21 +383,6 @@ export default function SignUpPage() {
             </div>
           </CardFooter>
         </Card>
-
-        {/* Mobile Brand Info */}
-        <div className="lg:hidden absolute bottom-8 left-4 right-4">
-          <div className="text-center p-4 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/30">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <div className="p-1 bg-gradient-to-br from-[#fd6a3e] to-[#f97316] rounded-lg">
-                <Brain className="h-4 w-4 text-white" />
-              </div>
-              <span className="font-bold text-[#022e7d]">LearnBrigeEdu</span>
-            </div>
-            <p className="text-xs text-gray-600">
-              Transform your learning with AI-powered flashcards
-            </p>
-          </div>
-        </div>
       </div>
     </div>
   );
